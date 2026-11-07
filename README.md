@@ -70,7 +70,7 @@ swarmscope/
   report.py, cli.py
 scripts/               download_ai_village, sweep_inference, compare_villages, flag_early, transluce_to_jsonl
 tests/                 planted-collusion and tie-test checks, loader tests, one test per detector
-review/                independent review, blind-label scores, draft Swarm Traces access request
+review/                independent review, blind-label scores
 outputs/swarm_traces/, outputs/ai_village_swarm-village/   report.md, findings.json, viewer HTML
 ```
 

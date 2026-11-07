@@ -37,7 +37,7 @@ We also test whether the tool **could have flagged the coordination early**. The
 | Spread animation in the viewer | Done: "Follow an item" draws each adoption as an arrow at its time. |
 | Validation | Done (§10.8): independent review of 10 claims, blind labels with confidence intervals, 18 tests (11 detector, 4 loader, 3 synthetic). |
 | Generic loader on an outside log | Done on Transluce [D3] (§10.9). |
-| Swarm Traces unredacted fields | Not available. An access request is drafted in `review/swarm_traces_access_request.md` (not sent). |
+| Swarm Traces unredacted fields | Not available, by the authors' choice: they redacted usernames and infrastructure details at Hugging Face's request. We work with the public release only. |
 
 ## 4. Data
 
@@ -435,13 +435,13 @@ As in Riedl's own results, the practical criterion is almost never positive. Pai
 10. **Role drift needs the agent to write its goal down.** Blind labels put its recall near 47%: statements phrased as "drawn role", "harness goal" or "meta-assignment" are missed.
 11. **Claims made by acting, not saying.** The authority detector reads phrases; the real god "acting as god" without saying so was its one miss in 100 random messages.
 12. **Human influence is lexical and link-based.** We measure whether agents reuse a viewer's rare words or open a viewer's link. We cannot tell agreement from compliance, and a link an agent would have found anyway counts as followed.
-13. **Swarm Traces stays limited by redaction.** No unredacted release or access process exists; a draft access request is in `review/swarm_traces_access_request.md`.
+13. **Swarm Traces stays limited by redaction.** The authors chose to redact usernames and infrastructure details (at Hugging Face's request), and there is no access process. We do not ask for the redacted fields.
 
 ## 13. Next steps
 
 1. **AI Village, next steps.** Compare each agent's actions with its role (does the Minister of Agriculture act on farms?), not only its stated role. Raise drift recall (now about 47%) with phrases such as "drawn role" and "harness goal". Use message content, not only timing, in the emergence test.
 2. **Harder synthetic tests.** Plants inside popular resources, rotating aliases, groups larger than 3.
-3. **Use the gzip and JWT times** if unredacted access becomes available. This removes most of the dating inference.
+3. **Use the gzip and JWT times** if the authors ever choose to release them. This removes most of the dating inference.
 4. **Deploy.** Publish the viewer, then add a small upload page: drop in a JSONL log, map its fields, and get the viewer back.
 
 ## 14. References
