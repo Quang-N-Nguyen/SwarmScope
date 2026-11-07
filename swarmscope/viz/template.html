@@ -102,6 +102,27 @@
   .legend-item .ln{width:18px;height:0;border-top:2px solid var(--muted)}
   .legend-item .ln.dash{border-top-style:dashed}
   .kpi-s{font:12px var(--f-data);color:var(--muted);margin-top:2px}
+  /* forensics charts: categorical slots 1-3 of the reference palette, validated
+     all-pairs on both panel colours (light aqua < 3:1, so every line has a direct label) */
+  #app{--s1:#2a78d6;--s2:#eb6834;--s3:#1baf7a}
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) #app{--s1:#3987e5;--s2:#d95926;--s3:#199e70}}
+  :root[data-theme="dark"] #app{--s1:#3987e5;--s2:#d95926;--s3:#199e70}
+  #fx{position:absolute;inset:0;overflow-y:auto;background:var(--bg);padding:16px 18px 28px;z-index:4}
+  .fx-intro{max-width:980px;margin-bottom:6px}
+  .fx-h{font:600 16px/1.3 var(--f-display);margin:0 0 4px}
+  .fx-card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px 8px;margin-top:12px;max-width:980px;position:relative}
+  .fx-card h3{font:600 13.5px/1.3 var(--f-body);margin:0}
+  .fx-card .sub{font-size:12px;color:var(--muted);margin:2px 0 6px;max-width:760px}
+  .fx-legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--muted);margin-bottom:2px}
+  .fx-legend .sw{display:inline-block;width:14px;height:0;border-top:2px solid;vertical-align:middle;margin-right:5px}
+  .fx-legend .sw.dash{border-top-style:dashed}
+  .fx-card svg{display:block;width:100%;overflow:visible}
+  .fx-card svg text{font:11px var(--f-data);fill:var(--muted)}
+  .fx-card svg .lab{font:600 11px var(--f-body);fill:var(--ink)}
+  .fx-card svg .ms text{fill:var(--ink);opacity:.7}
+  .fx-tip{position:absolute;pointer-events:none;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 9px;font-size:12px;opacity:0;z-index:6;box-shadow:0 4px 18px rgba(var(--tie),.18);white-space:nowrap}
+  .fx-tip b{font-family:var(--f-data);font-weight:500}
+  .fx-note{font-size:12px;color:var(--ink);margin:4px 0 4px;padding:6px 9px;border-left:3px solid var(--accent2);background:var(--panel2);border-radius:0 6px 6px 0}
 </style>
 <div id="app">
   <header>
@@ -141,6 +162,7 @@
       <div class="row seg">
         <button class="btn on" id="mode-activity">Activity</button>
         <button class="btn" id="mode-coord">Coordination</button>
+        <button class="btn" id="mode-fx" hidden>Forensics charts</button>
       </div>
       <div class="hint" id="mode-hint"></div>
     </div>
@@ -189,6 +211,13 @@
   <main>
     <canvas id="cv"></canvas>
     <div id="tooltip"></div>
+    <div id="fx" hidden>
+      <div class="fx-intro">
+        <h2 class="fx-h">What happened, hour by hour</h2>
+        <p class="hint" style="margin:0">All charts share one clock (UTC). Grey lines are the milestones (operator announcements or new village goals). Hover a chart to read the values.</p>
+      </div>
+      <div id="fx-charts"></div>
+    </div>
   </main>
 
   <footer>
@@ -235,8 +264,16 @@ const pct = x => x==null ? '—' : (x*100).toFixed(1)+'%';
 document.getElementById('s-src').textContent = META.source;
 document.getElementById('s-ev').textContent = META.n_events.toLocaleString();
 document.getElementById('s-ag').textContent = META.n_agents.toLocaleString();
-document.getElementById('s-named').textContent = pct(META.named_total_frac);
-document.getElementById('s-dated').textContent = pct(META.dated_total_frac);
+document.getElementById('s-named').textContent = META.attributed ? 'all' : pct(META.named_total_frac);
+document.getElementById('s-dated').textContent = META.attributed ? 'all' : pct(META.dated_total_frac);
+if(META.attributed){
+  // Named-speaker logs (AI Village): agent-agent edges are @-addresses, not shared resources.
+  document.querySelector('label[for="k-coord"], #k-coord').parentElement.lastChild.textContent=' agent @-addressed another agent';
+  document.getElementById('mode-coord').textContent='Conversation';
+  document.querySelector('#tie-sec .hint').textContent='Tie strength = number of @-addresses between the two agents (both directions). Raise it to keep only the pairs that talked a lot.';
+  document.getElementById('rg-week').textContent='Main period';
+  document.querySelector('#headline h2').textContent='Change detection and authority';
+}
 
 // ---------- graph data
 const nodeById = new Map();
@@ -326,6 +363,8 @@ function startSim(){
   else { sim.on('tick',draw); sim.alpha(0.9).restart(); }
 }
 function nodeColor(n){
+  if(mode==='coordination' && META.attributed && n.ty==='agent')
+    return n.comm===1 ? getVar('--alert') : n.comm===2 ? getVar('--dest') : getVar('--agent');
   if(mode==='coordination') return n.comm>=0 ? COMM_COLORS[n.comm%COMM_COLORS.length] : getVar('--resource');
   return TYPE_COLORS[n.ty]||getVar('--resource');
 }
@@ -395,15 +434,16 @@ function renderDetail(n){
   const el=document.getElementById('detail');
   if(!n){ el.innerHTML='<span class="tiny">Click a node to inspect it.</span>'; return; }
   const rows=[['type',n.ty],['events',n.c.toLocaleString()]];
-  if(n.ty==='agent') rows.push(['signed / inferred', `${n.obs||0} / ${n.inf||0}`]);
+  if(n.ty==='agent' && !META.attributed) rows.push(['signed / inferred', `${n.obs||0} / ${n.inf||0}`]);
   if(n.t0!=null) rows.push(['first seen', fmtTime(n.t0)]);
   if(n.tn!=null && n.tn!==n.t0) rows.push(['last seen', fmtTime(n.tn)]);
   if(n.t0==null) rows.push(['time','no date (visible in discovery order only)']);
-  if(n.role) rows.push(['main tactic', n.role]);
+  if(n.role) rows.push([META.attributed ? 'assigned role' : 'main tactic', n.role]);
   if(n.spec!=null) rows.push(['specialisation', n.spec]);
   if(n.led) rows.push(['led / followed', `${n.led} / ${n.fol||0}`]);
   if(n.betw) rows.push(['betweenness', n.betw]);
-  if(n.comm>=0 && n.ty==='agent') rows.push(['community', n.comm]);
+  if(META.attributed && n.ty==='agent') rows.push(['authority', ['—','claimed a role it was not given','assigned holder of the role'][n.comm]||'—']);
+  else if(n.comm>=0 && n.ty==='agent') rows.push(['community', n.comm]);
   let h=`<div class="big">${esc(n.lab)}</div><div class="grid">`+rows.map(([k,v])=>`<div>${esc(k)}</div><div>${esc(v)}</div>`).join('')+'</div>';
   if((n.tac||[]).length) h+=`<div style="margin-top:6px"><span class="k">tactics</span><br>${n.tac.map(m=>`<span class="pill">${esc(m)}</span>`).join('')}</div>`;
   if((n.mech||[]).length) h+=`<div style="margin-top:6px"><span class="k">top mechanisms</span><br>${n.mech.map(m=>`<span class="pill">${esc(m)}</span>`).join('')}</div>`;
@@ -425,7 +465,29 @@ function renderDetail(n){
 
 // ---------- headline
 (function(){
-  const h=DATA.headline||{}; if(!h.first_alert_when) return;
+  const h=DATA.headline||{};
+  if(h.attributed){
+    document.getElementById('headline').hidden=false;
+    if(h.cp_total){
+      document.getElementById('kpi-lead').textContent=`${h.cp_detected} of ${h.cp_total}`;
+      document.getElementById('kpi-lead-l').textContent=`${h.ms_source||'milestones'} caught by the online change detector within 90 minutes (${h.cp_false} alerts with no milestone).`+(h.daily_flagged!=null?` The day-level check flags ${h.daily_flagged} of them, and ${Math.round(h.daily_precision*100)}% of its alert days follow a milestone.`:'')
+        +(h.role_before!=null?` It missed the silent role reshuffle: role talk went from ${pct(h.role_before)} of messages before it to ${pct(h.role_after)} after.`:'')
+        +(h.drift_alert?` The agents' memories show it: role-drift alert at ${new Date(h.drift_alert*1000).toISOString().slice(11,16)} UTC.`:'');
+    } else {
+      document.getElementById('kpi-lead').textContent=`${h.cp_alerts} alerts`;
+      document.getElementById('kpi-lead-l').textContent=`from the online change detector over ${h.days} days. There are no operator announcements to check them against, so each one needs a human to read the chat around it.`;
+    }
+    if(h.claim){
+      document.getElementById('kpi-alert').textContent=`${h.claim.agent} claims god`;
+      document.getElementById('kpi-alert-l').textContent=`at ${new Date(h.claim.ts*1000).toISOString().slice(11,16)} UTC without being assigned the role; ${h.claim.endorsers} agents then addressed it as god.`;
+    } else {
+      document.getElementById('kpi-alert').textContent='No role claims';
+      document.getElementById('kpi-alert-l').textContent='This village assigns no privileged role, or no agent claimed one it was not given.';
+    }
+    document.getElementById('kpi-acc').textContent='Names and times are in the data (no inference). Dark timeline lines = milestones.';
+    return;
+  }
+  if(!h.first_alert_when) return;
   document.getElementById('headline').hidden=false;
   const lp=h.lead_private||{}, lb=h.lead_board||{};
   if(lp.hf_worker_rce!=null){
@@ -477,8 +539,12 @@ function buildMarkers(){
     (DATA.milestones||[]).forEach(m=>{
       const inR = m.ts>=lo && m.ts<=hi;
       mk(m.ts,'ms',`${m.label}: ${fmtTime(m.ts)}`,()=>setT(m.ts));
-      addChip(`<span class="sw"></span>${esc(m.label)}${inR?'':' (outside range)'}`,'ms',()=>{ if(!inR){ range='all'; applyRange(); } setT(m.ts); },fmtTime(m.ts));
+      // Many milestones (main-village: 49 goal changes): markers only, one summary chip.
+      if((DATA.milestones||[]).length<=12)
+        addChip(`<span class="sw"></span>${esc(m.label)}${inR?'':' (outside range)'}`,'ms',()=>{ if(!inR){ range='all'; applyRange(); } setT(m.ts); },fmtTime(m.ts));
     });
+    if((DATA.milestones||[]).length>12)
+      addChip(`<span class="sw"></span>${DATA.milestones.length} milestones (hover the dark marks)`,'ms',()=>{},'');
     (DATA.clock_signals||[]).slice().sort((a,b)=>a.ts-b.ts).forEach(s=>{
       const inR = s.ts>=lo && s.ts<=hi;
       // A time of exactly 00:00 or 12:00 is often a date written as a time.
@@ -520,10 +586,11 @@ function applyAxis(){
   seg(axis==='clock'?'ax-clock':'ax-disc',[axis==='clock'?'ax-disc':'ax-clock']);
   document.getElementById('range-row').hidden = axis!=='clock';
   document.getElementById('axis-hint').textContent = axis==='clock'
-    ? `Real time. Only events with a date are shown: dates read from the data plus inferred dates (${pct(META.dated_total_frac)} of events).`
+    ? (META.attributed ? 'Real time, read from the log (every event has one).' : `Real time. Only events with a date are shown: dates read from the data plus inferred dates (${pct(META.dated_total_frac)} of events).`)
     : 'Every event, in the order the reconstruction found its resources. This is not a clock: a held-out test showed it predicts time worse than guessing the median day.';
   document.getElementById('axis-note').textContent = axis==='clock'
-    ? 'Bars: dated events per time slice (dark = date read from the data, light = inferred). Dark lines: incident milestones (METR / Swarm Traces). Amber: first firing of each signal in the strict replay.'
+    ? (META.attributed ? 'Bars: events per time slice. Dark lines: milestones. Amber: first firing of each Swarm Traces signal (on this benign swarm, these are false alarms).'
+       : 'Bars: dated events per time slice (dark = date read from the data, light = inferred). Dark lines: incident milestones (METR / Swarm Traces). Amber: first firing of each signal in the strict replay.')
     : 'Bars: share of events in each slice that are board / mailbox writes. Amber: first firing of each signal in this order.';
   applyRange();
 }
@@ -534,9 +601,13 @@ document.getElementById('rg-all').addEventListener('click',()=>{ range='all'; ap
 if(!HAS_CLOCK) document.getElementById('ax-clock').disabled=true;
 function setMode(m){
   mode=m; seg(m==='activity'?'mode-activity':'mode-coord',[m==='activity'?'mode-coord':'mode-activity']);
-  document.getElementById('mode-hint').textContent = m==='activity'
+  document.getElementById('mode-hint').textContent = META.attributed
+    ? (m==='activity'
+      ? 'Agents (circles) and the files, links and commits they mentioned (squares).'
+      : 'Agent to agent. Two agents are linked when one wrote @name to the other; thicker = more addresses. Red = claimed the god role without being assigned it; yellow = the assigned god; teal = everyone else. (All agents talk in one public room, so there are no separate communities.)')
+    : (m==='activity'
     ? 'Agents (circles) and the datasets, credentials and mailboxes they used (squares). Dashed edge = the author was inferred.'
-    : 'Agent to agent. Two agents are linked when they used the same resource; thicker = rarer resource. Colour = community. Signed authors only.';
+    : 'Agent to agent. Two agents are linked when they used the same resource; thicker = rarer resource. Colour = community. Signed authors only.');
   document.getElementById('tie-sec').hidden = m!=='coordination';
   startSim(); draw();
 }
@@ -558,5 +629,143 @@ window.addEventListener('resize',resize);
 resize(); setMode('activity'); applyAxis();
 if(window.matchMedia) window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{readTheme();draw();drawStrip();});
 new MutationObserver(()=>{readTheme();draw();drawStrip();}).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+})();
+</script>
+<script>
+/* Forensics charts (logs with named speakers). Small multiples on one UTC axis. */
+(function(){
+"use strict";
+const F=DATA.forensics; if(!F) return;
+const btn=document.getElementById('mode-fx'), panel=document.getElementById('fx');
+btn.hidden=false;
+const show=on=>{ panel.hidden=!on; btn.classList.toggle('on',on);
+  if(on){ ['mode-activity','mode-coord'].forEach(id=>document.getElementById(id).classList.remove('on')); render(); } };
+btn.addEventListener('click',()=>show(true));
+['mode-activity','mode-coord'].forEach(id=>document.getElementById(id).addEventListener('click',()=>show(false)));
+
+const css=n=>getComputedStyle(document.getElementById('app')).getPropertyValue(n).trim();
+const MS=(DATA.milestones||[]).filter(m=>m.short!=='start');
+const t0=DATA.clock.tmin, t1=DATA.clock.tmax;
+const hhmm=t=>(t1-t0)>3*86400?new Date(t*1000).toISOString().slice(5,16).replace('T',' '):new Date(t*1000).toISOString().slice(11,16);
+const cum=times=>{ const ts=times.slice().sort((a,b)=>a-b); const out=[[t0,0]]; ts.forEach((t,i)=>out.push([t,i+1])); out.push([t1,ts.length]); return out; };
+
+function chart(root, o){
+  const card=document.createElement('div'); card.className='fx-card'; root.appendChild(card);
+  chart.n=(chart.n||0)+1; o.title=o.title.replace(/^\d+ · /,`${chart.n} · `);
+  card.innerHTML=`<h3>${o.title}</h3><div class="sub">${o.sub}</div>`;
+  if(o.series.length>1){ const lg=document.createElement('div'); lg.className='fx-legend';
+    lg.innerHTML=o.series.map(s=>`<span><span class="sw${s.dash?' dash':''}" style="border-color:${css(s.c)}"></span>${s.name}</span>`).join('');
+    card.appendChild(lg); }
+  if(o.note){ const n=document.createElement('div'); n.className='fx-note'; n.textContent=o.note; card.appendChild(n); }
+  const W=Math.max(300,card.clientWidth-28), H=(o.h||170)+20, m={l:40,r:o.r||(W<560?84:118),t:42,b:22};
+  const svg=d3.select(card).append('svg').attr('viewBox',`0 0 ${W} ${H}`).attr('height',H)
+    .attr('role','img').attr('aria-label',o.title);
+  const x=d3.scaleUtc().domain([t0*1000,t1*1000]).range([m.l,W-m.r]);
+  const all=o.series.flatMap(s=>s.pts.map(p=>p[1])).concat(o.extra||[]);
+  const y=d3.scaleLinear().domain(o.ydom||[Math.min(0,d3.min(all)),d3.max(all)||1]).nice().range([H-m.b,m.t]);
+  const g=svg.append('g');
+  g.append('g').attr('transform',`translate(0,${H-m.b})`).call(d3.axisBottom(x).ticks(Math.min(10,W/90)).tickFormat(d3.utcFormat((t1-t0)>3*86400?'%b %d':'%H:%M')).tickSizeOuter(0))
+    .call(a=>a.select('.domain').attr('stroke',css('--line'))).call(a=>a.selectAll('line').attr('stroke',css('--line')));
+  g.append('g').attr('transform',`translate(${m.l},0)`).call(d3.axisLeft(y).ticks(4).tickFormat(o.yfmt||d3.format('~s')).tickSize(-(W-m.l-m.r)))
+    .call(a=>a.select('.domain').remove()).call(a=>a.selectAll('line').attr('stroke',css('--line')).attr('stroke-opacity',.6));
+  // operator messages
+  const ms=g.append('g').attr('class','ms');
+  MS.forEach((mm,i)=>{ const X=x(mm.ts*1000);
+    ms.append('line').attr('x1',X).attr('x2',X).attr('y1',(i%3)*11+2).attr('y2',H-m.b).attr('stroke',css('--ink')).attr('stroke-opacity',.35).attr('stroke-width',1.5);
+    if(MS.length<=8) ms.append('text').attr('x',X+3).attr('y',10+(i%3)*11).text(mm.short); });
+  (o.refs||[]).forEach(v=>g.append('line').attr('x1',m.l).attr('x2',W-m.r).attr('y1',y(v)).attr('y2',y(v))
+    .attr('stroke',css('--muted')).attr('stroke-dasharray','3 3').attr('stroke-width',1));
+  if(o.bars){ const s=o.series[0], bw=Math.max(1,x((t0+o.bars)*1000)-x(t0*1000)-2);
+    g.append('g').selectAll('rect').data(s.pts).join('rect').attr('x',p=>x(p[0]*1000)-bw/2).attr('width',bw)
+      .attr('y',p=>y(p[1])).attr('height',p=>Math.max(0,y(0)-y(p[1]))).attr('rx',Math.min(4,bw/2)).attr('fill',css(s.c)); }
+  else o.series.forEach(s=>{
+    const line=(s.step?d3.line().curve(d3.curveStepAfter):d3.line()).x(p=>x(p[0]*1000)).y(p=>y(p[1])).defined(p=>p[1]!=null);
+    g.append('path').datum(s.pts).attr('fill','none').attr('stroke',css(s.c)).attr('stroke-width',2)
+      .attr('stroke-dasharray',s.dash?'5 3':null).attr('stroke-linejoin','round').attr('d',line); });
+  // direct labels at line ends, nudged apart
+  if(!o.bars){ const ends=o.series.map(s=>{const p=s.pts[s.pts.length-1]; return {s,y:y(p[1]),v:p[1]};}).sort((a,b)=>a.y-b.y);
+    for(let i=1;i<ends.length;i++) if(ends[i].y-ends[i-1].y<13) ends[i].y=ends[i-1].y+13;
+    ends.forEach(e=>g.append('text').attr('class','lab').attr('x',W-m.r+6).attr('y',e.y+4).text(`${e.s.short||e.s.name} ${o.endfmt?o.endfmt(e.v):''}`)); }
+  (o.marks||[]).forEach(t=>g.append('path').attr('d',d3.symbol(d3.symbolTriangle,70)()).attr('transform',`translate(${x(t*1000)},${m.t+2}) rotate(180)`)
+    .attr('fill',css('--alert')).attr('stroke',css('--panel')).attr('stroke-width',2));
+  // hover: crosshair + tooltip
+  const tip=document.createElement('div'); tip.className='fx-tip'; card.appendChild(tip);
+  const hair=g.append('line').attr('y1',m.t).attr('y2',H-m.b).attr('stroke',css('--muted')).attr('opacity',0);
+  const at=(pts,t)=>{ let v=null; for(const p of pts){ if(p[0]<=t) v=p; else break; } return v; };
+  const near=(pts,t)=>pts.reduce((b,p)=>Math.abs(p[0]-t)<Math.abs(b[0]-t)?p:b,pts[0]);
+  svg.append('rect').attr('x',m.l).attr('y',m.t).attr('width',W-m.l-m.r).attr('height',H-m.t-m.b).attr('fill','transparent')
+    .on('mousemove',ev=>{ const [mx]=d3.pointer(ev); const t=x.invert(mx)/1000; hair.attr('x1',mx).attr('x2',mx).attr('opacity',.6);
+      const rows=o.series.map(s=>{ const p=(s.step?at:near)(s.pts,t); return p?`<div><span class="sw" style="display:inline-block;width:10px;height:0;border-top:2px solid ${css(s.c)};margin-right:5px;vertical-align:middle"></span>${s.name}: <b>${o.tipfmt?o.tipfmt(p):p[1]}</b></div>`:''; }).join('');
+      tip.innerHTML=`<div class="tiny">${hhmm(t)} UTC</div>${rows}`; tip.style.opacity=1;
+      const r=card.getBoundingClientRect(), sr=svg.node().getBoundingClientRect(), px=sr.left-r.left+mx*sr.width/W;
+      tip.style.left=Math.min(px+12,r.width-tip.offsetWidth-6)+'px'; tip.style.top=(sr.top-r.top+10)+'px'; })
+    .on('mouseleave',()=>{tip.style.opacity=0; hair.attr('opacity',0);});
+}
+
+let done=false;
+function render(){
+  if(done) return; done=true;
+  const root=document.getElementById('fx-charts'); root.innerHTML=''; chart.n=0;
+  const W0=root.clientWidth;
+  const C=['--s1','--s2','--s3'];
+  if(F.cp && F.cp.series.length){
+    chart(root,{title:'1 · Did the chat change? (online change detector)',
+      sub:`Every 10 minutes: how unusual the last 30 minutes are, compared with the 2 hours before. Topic = which words agents use; volume = how many messages. An alert (red triangle) fires at a score of ${F.cp.z} or more.`,
+      series:[{name:'topic change',short:'topic',c:C[0],pts:F.cp.series.map(r=>[r[0],r[1]])},
+              {name:'volume change',short:'volume',c:C[1],pts:F.cp.series.map(r=>[r[0],r[2]])}],
+      refs:[F.cp.z,-F.cp.z], marks:F.cp.alerts, yfmt:d3.format('~f'), tipfmt:p=>p[1].toFixed(1),
+      note:(()=>{ const h=DATA.headline||{}, rows=(h.cp_rows||[]); if(!rows.length) return '';
+        const lab=i=>(MS[i]||{}).short||`message ${i+2}`;
+        const hit=rows.map((r,i)=>r[1]?`${lab(i)} (${Math.round(r[2])} min later)`:null).filter(Boolean);
+        const miss=rows.map((r,i)=>r[1]?null:lab(i)).filter(Boolean);
+        if(rows.length>8) return `Caught ${hit.length} of ${rows.length} milestones within 90 minutes.`+(F.daily&&F.daily.flagged!=null?' See the next chart for the day-level check.':'');
+        return `Caught: ${hit.join(', ')||'none'}. Missed: ${miss.join(', ')||'none'}.`; })()});
+  }
+  if(F.daily && F.daily.series && F.daily.series.length){
+    const d=F.daily;
+    chart(root,{title:'2 · Did the topic change from day to day? (day-level check)',
+      sub:`Each active day is compared with the ${d.ref_days} active days before it (which words agents use). Red triangle: alert day (score of ${d.z} or more). Grey lines: milestones.`,
+      series:[{name:'day-to-day topic change',short:'topic',c:C[0],pts:d.series}], refs:[d.z], marks:d.alerts,
+      yfmt:d3.format('~f'), tipfmt:p=>p[1].toFixed(1),
+      note:d.flagged!=null?`Flags ${d.flagged} of ${d.milestones} milestones within their first ${d.lag} active days (${Math.round(d.recall*100)}%, against ${Math.round(d.chance*100)}% for any day). ${Math.round(d.precision*100)}% of alert days fall right after a milestone.`:''});
+  }
+  if(F.roles && F.roles.length){
+    chart(root,{title:'2 · Did the agents notice the role reshuffle?',
+      sub:'Share of agent messages in each 30-minute slot that mention "role" or "roles". If agents had noticed that their roles changed, this would rise after "phase 2 (repeat)".',
+      series:[{name:'messages that mention a role',c:C[0],pts:F.roles.map(r=>[r[0],r[1],r[2]])}], bars:1800,
+      yfmt:d3.format('.0%'), ydom:[0,Math.max(.1,d3.max(F.roles,r=>r[1]))], r:(W0<560?70:96),
+      tipfmt:p=>`${(p[1]*100).toFixed(0)}% of ${p[2]} messages`,
+      note:(()=>{ const rep=MS.find(mm=>/repeat/.test(mm.short)); if(!rep) return '';
+        const avg=(a,b)=>{ const r=F.roles.filter(x=>x[0]>=a&&x[0]<b); const n=d3.sum(r,x=>x[2]); return n?d3.sum(r,x=>x[1]*x[2])/n:0; };
+        const b=avg(rep.ts-3*3600,rep.ts), a=avg(rep.ts,rep.ts+3*3600);
+        return `3 hours before "${rep.short}": ${(b*100).toFixed(0)}% of messages mention a role. 3 hours after: ${(a*100).toFixed(0)}%. No rise, so the agents did not notice. (Role talk also fades by itself once roles settle.)`; })()});
+  }
+  if(F.drift && F.drift.series.length){
+    chart(root,{title:'3 · Did the agents\u2019 own goals change? (memories and work-session goals)',
+      sub:'Share of statements in which an agent quotes its own goal ("Play your assigned role: …") and names a role it was NOT assigned. Red triangle: online alert (3 or more agents within 30 minutes).',
+      series:[{name:'statements naming another role',c:C[1],pts:F.drift.series.map(r=>[r[0],r[2]/r[1],r[1],r[2]])}], bars:1800,
+      yfmt:d3.format('.0%'), ydom:[0,1], r:(W0<560?70:96), marks:F.drift.alert?[F.drift.alert]:[],
+      tipfmt:p=>`${p[3]} of ${p[2]} statements (${(p[1]*100).toFixed(0)}%)`,
+      note:(()=>{ if(!F.drift.alert) return ''; const rep=MS.filter(mm=>mm.ts<=F.drift.alert).pop(); const b=F.drift.before||{};
+        return `Alert at ${hhmm(F.drift.alert)} UTC`+(rep?`, ${Math.round((F.drift.alert-rep.ts)/60)} min after "${rep.short}"`:'')+`. Before it, ${b.mismatching||0} of ${b.statements||0} statements named another role. ${F.drift.agents} agents drifted. The chat (previous chart) stayed silent; the agents' private notes did not.`; })()});
+  }
+  if(F.claims && F.claims.length){
+    chart(root,{title:'4 · Who did the swarm treat as "god"?',
+      sub:'Running count of distinct agents that addressed each claimant (@name) in a message about "god". Only one agent was assigned the role.',
+      series:F.claims.map((c,i)=>({name:c.name,short:c.name.split(' ')[0],c:C[i%3],step:true,dash:/\(assigned/.test(c.name),pts:cum(c.times)})),
+      endfmt:v=>v, tipfmt:p=>`${p[1]} agents`,
+      note:(()=>{ const h=(DATA.headline||{}).claim; if(!h) return '';
+        const real=F.claims.find(c=>/\(assigned/.test(c.name));
+        return `${h.agent} was not assigned the role, claimed it at ${hhmm(h.ts)} UTC, and was then addressed as god by ${h.endorsers} agents`+(real?` (the assigned holder: ${real.times.length}).`:'.'); })()});
+  }
+  if(F.spread && F.spread.length){
+    chart(root,{title:'5 · How fast did information spread?',
+      sub:'Running count of distinct agents that used each item for the first time: the most widely used file, commit, and coined term.',
+      series:F.spread.map((c,i)=>({name:c.name,short:c.name.split(' ')[0],c:C[i%3],step:true,pts:cum(c.times)})),
+      endfmt:v=>v, tipfmt:p=>`${p[1]} agents`});
+  }
+}
+let rt; window.addEventListener('resize',()=>{ if(panel.hidden) return; clearTimeout(rt); rt=setTimeout(()=>{done=false; render();},200); });
+new MutationObserver(()=>{ if(!panel.hidden){done=false; render();} }).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
 })();
 </script>

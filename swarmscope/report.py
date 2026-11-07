@@ -14,6 +14,7 @@ from typing import Dict
 
 from .events import EventLog
 from .detectors import coordination, info_spread, covert, early_warning, research
+from .detectors import conversation, diffusion, changepoint, authority, actions
 from .graph import build_agent_projection
 from .infer import links as links_mod, attribution, dating, aliases
 from .viz import export
@@ -81,8 +82,28 @@ def _summary(log: EventLog, cov: dict, coord: dict, inf: dict, res: dict) -> dic
     )
 
 
+def is_attributed(log: EventLog) -> bool:
+    """True when most events name their author (AI Village, most chat logs)."""
+    return bool(log.events) and sum(1 for e in log.events if e.actor) >= 0.5 * len(log)
+
+
+def analyze_attributed(log: EventLog) -> dict:
+    """Detectors that need real names and clock times (see detectors/*.py)."""
+    au = authority.run_all(log)
+    return dict(conversation=conversation.run_all(log),
+                diffusion=diffusion.run_all(log, getattr(log, "case_studies", None)),
+                changepoint=changepoint.run_all(log),
+                authority=au,
+                actions=actions.run_all(log, au))
+
+
 def analyze(log: EventLog, prefer_time: bool = True, inference: str = "balanced") -> dict:
-    inf = infer(log, inference)
+    attributed = is_attributed(log)
+    if attributed:
+        # Names and times are in the data: nothing to infer.
+        inf = dict(preset="off", note="authors and times are recorded in this log")
+    else:
+        inf = infer(log, inference)
     coord = coordination.run_all(log, prefer_time)
     spread = info_spread.run_all(log, prefer_time)
     cov = covert.run_all(log, prefer_time)
@@ -92,8 +113,16 @@ def analyze(log: EventLog, prefer_time: bool = True, inference: str = "balanced"
               for e in proj.edges if e.get("weight", 0) >= 1.0]
     res = research.run_all(log, comms, strong)
     summary = _summary(log, cov, coord, inf, res)
-    return dict(summary=summary, inference=inf, coordination=coord, info_spread=spread,
-                covert=cov, early_warning=ew, research=res)
+    summary["attributed"] = attributed
+    if attributed:
+        summary["n_ai_agents"] = len({e.actor for e in log.events if e.actor and not e.actor.startswith("human:")})
+        summary["n_humans"] = len({e.actor for e in log.events if e.actor and e.actor.startswith("human:")})
+        summary["village"] = getattr(log, "village", None)
+    out = dict(summary=summary, inference=inf, coordination=coord, info_spread=spread,
+               covert=cov, early_warning=ew, research=res)
+    if attributed:
+        out["attributed"] = analyze_attributed(log)
+    return out
 
 
 # --------------------------------------------------------------------------
@@ -111,7 +140,303 @@ def _pct(x):
     return "-" if x is None else f"{x*100:.1f}%"
 
 
+def _hm(ts):
+    return "-" if ts is None else _dt.datetime.fromtimestamp(ts, _dt.timezone.utc).strftime("%b %d %H:%M")
+
+
+def _markdown_attributed(log: EventLog, f: dict) -> str:
+    """Report for logs that name every speaker (AI Village).
+
+    Each section appears only when the log has data for it, and every number
+    in the text is computed from this log (no village-specific wording).
+    """
+    s, A = f["summary"], f["attributed"]
+    timed = log.timed_events()
+    hours = (timed[-1].ts - timed[0].ts) / 3600 if timed else 0
+    chats = [e for e in log.events if e.kind == "chat"]
+    agents = {e.actor for e in chats if e.actor and not e.actor.startswith("human:")}
+    humans = [e for e in chats if e.actor and e.actor.startswith("human:")]
+    rooms = Counter(e.channel for e in chats)
+    top_room_share = rooms.most_common(1)[0][1] / len(chats) if chats else 0
+    sec = [0]
+
+    def H(title):
+        sec[0] += 1
+        L.append(f"## {sec[0]}. {title}\n")
+        return sec[0]
+
+    L = [f"# SwarmScope findings: `{getattr(log, 'village', None) or s['source']}`\n"]
+    L.append(f"- Events: **{s['n_events']:,}** ({', '.join(f'{k}: {v:,}' for k, v in s['kinds'].items())})")
+    if timed:
+        span = f"{hours:.1f} h" if hours < 72 else f"{hours / 24:.0f} days"
+        L.append(f"- Agents who spoke: **{len(agents)}**; chat messages: **{len(chats):,}** "
+                 f"({len(humans):,} by humans); rooms: {len(rooms)} (largest holds {_pct(top_room_share)}); "
+                 f"time span: **{span}** ({_hm(timed[0].ts)} to {_hm(timed[-1].ts)} UTC)")
+    L.append("- Every event names its author and has a real time, so no inference is needed. "
+             "A message that writes `@name` is an edge from the speaker to that agent. Humans appear only as "
+             "anonymous ids (`human:` plus 8 characters).\n")
+    ms = getattr(log, "milestones", {}) or {}
+    lab = getattr(log, "milestone_labels", {}) or {}
+    nh = getattr(log, "human_messages", 0)
+    if ms and getattr(log, "milestone_source", None) == "village goal changes":
+        L.append(f"**Milestones: {len(ms)} village goal changes.** Humans wrote {nh:,} messages here, too many to be "
+                 "rare announcements, so we use the start of each new village goal as ground truth for "
+                 "\"something changed\" (first ones shown):\n")
+        L.append(_md_table(["milestone", "time (UTC)", "goal"],
+                           [(k, _hm(v), lab.get(k, "")[10:]) for k, v in sorted(ms.items(), key=lambda x: x[1])[:8]]))
+        L.append("")
+    elif ms:
+        nudges = getattr(log, "operator_nudges", 0)
+        L.append("**Operator announcements** (humans post rarely, so their messages to everyone are ground truth "
+                 "for \"something changed\"" + (f"; {nudges} personal nudges to single agents are left out" if nudges else "")
+                 + "):\n")
+        L.append(_md_table(["milestone", "time (UTC)", "first words"],
+                           [(k, _hm(v), lab.get(k, "")[10:]) for k, v in sorted(ms.items(), key=lambda x: x[1])]))
+        L.append("")
+    elif nh:
+        L.append(f"**No operator milestones.** Humans wrote {nh:,} messages here (in this village, viewers chat "
+                 "with the agents), so human messages are not rare announcements and cannot serve as ground "
+                 "truth. Change-point alerts below are unlabelled.\n")
+
+    # ---- who talked to whom
+    cv = A.get("conversation", {})
+    if cv:
+        H("Who talked to whom")
+        o, la = cv["overall"], cv["latency"]
+        if o["addresses"] < 50:
+            L.append(f"Agents here rarely address each other with `@name` ({o['addresses']} addresses in all), "
+                     "so the conversation network is too thin to measure.\n")
+        else:
+            L.append("`Gini` = how unequal incoming attention is (0 = equal, 1 = one agent gets all). "
+                     "`reciprocity` = share of addressed pairs that address each other back.\n")
+            if 1 < len(cv["phases"]) <= 12:
+                rows = [(p["label"][:40], _hm(p["start"]), p["speakers"], p["addresses"], p["addresses_per_hour"],
+                         p["reciprocity"], p["attention_gini"],
+                         ", ".join(f"{a} ({n})" for a, n in p["hubs"][:3])) for p in cv["phases"]]
+                L.append(_md_table(["phase (starts with)", "from", "speakers", "@-addresses", "per hour",
+                                    "reciprocity", "Gini", "top hubs"], rows))
+                L.append("")
+            L.append(f"Whole log: {o['addresses']:,} addresses between {o['addressed_pairs']:,} pairs, reciprocity "
+                     f"{o['reciprocity']}, Gini {o['attention_gini']}. Top hubs: "
+                     + ", ".join(f"{a} ({n})" for a, n in o["hubs"][:4]) + f". {_pct(la['answered_frac'])} of "
+                     f"addresses got an answer within 6 h (median {la['median_minutes']} min)."
+                     + (" Brokers (betweenness): " + ", ".join(f"{a} ({v})" for a, v in o["brokers"][:5]) + "."
+                        if o.get("brokers") else "") + "\n")
+
+    # ---- spread
+    df = A.get("diffusion", {})
+    if df:
+        rows = []
+        for kind in ("files", "commits", "terms"):
+            for r in df.get(kind, [])[:5]:
+                rows.append((kind[:-1], f"`{r['item'][:40]}`", r["origin"], r["reach"], r["hours_to_half"],
+                             r["depth"], _pct(r["sourced_by_address"])))
+        if rows or df.get("case_studies"):
+            H("How information spread")
+        if rows:
+            L.append("Each item is a file name, a commit, or a coined identifier. For each agent we take its first "
+                     "use. `source by @` = share of adopters whose probable source had addressed them before "
+                     "(exposure model, Goel, Watts & Goldstein, 2012).\n")
+            L.append(_md_table(["kind", "item", "first agent", "agents", "hours to half", "tree depth",
+                                "source by @"], rows))
+            L.append("")
+        for name, c in (df.get("case_studies") or {}).items():
+            L.append(f"**Case study `{name}`.** {c.get('question', '')}\n")
+            if c.get("reach"):
+                L.append(f"- From then to the end of the log: {c['messages']:,} messages by {c['reach']} agents; "
+                         f"half of them within {c['hours_to_half']} h; first: {c['origin']} at "
+                         f"{_hm(c['first_ts'])} UTC.")
+            else:
+                L.append("- No matching messages after it.")
+            vc = c.get("vs_control")
+            if vc:
+                b, a = vc["before"], vc["after"]
+                L.append(f"- Control window before: {b['matching']} of {b['messages']} messages "
+                         f"({_pct(b['share'])}, {b['agents']} agents); same length after: {a['matching']} of "
+                         f"{a['messages']} ({_pct(a['share'])}, {a['agents']} agents). Ratio **{vc['ratio']}** "
+                         f"(1 = no change).")
+                if name.startswith("role"):
+                    L.append("- Caution: role talk also fades by itself once roles settle, so a drop does not "
+                             "prove anything. But a reassignment that the agents noticed would give a rise.")
+            L.append("")
+
+    # ---- early warning
+    cp = A.get("changepoint", {})
+    H("Could it have flagged a change early?")
+    if not cp.get("params"):
+        L.append("Too few chat messages for the change-point detector (it needs at least 50).\n")
+    else:
+        p = cp["params"]
+        L.append(f"Online change-point detector on chat: every {p['step']} min it compares the last "
+                 f"{p['window']} min with the {p['baseline']} min before, on topic (Jensen-Shannon "
+                 f"divergence of word counts) and volume (log rate ratio), each turned into a robust z-score "
+                 f"against its own past"
+                 + (" (for logs longer than 3 days: against the same hour on earlier days, so a daily schedule "
+                    "is not an alert)" if p.get("daily_baseline") else "")
+                 + f". Alert at |z| >= {p['z']}. Steps where either window is empty are skipped.\n")
+        sc = cp.get("score", {})
+        if sc:
+            if len(sc["milestones"]) <= 12:
+                L.append(_md_table(["milestone", "time (UTC)", "detected?", "delay (min)"],
+                                   [(r["milestone"], _hm(r["ts"]), "yes" if r["detected"] else "**no**",
+                                     r["delay_minutes"] if r["delay_minutes"] is not None else "-")
+                                    for r in sc["milestones"]]))
+            src = getattr(log, "milestone_source", None) or "milestones"
+            L.append(f"\nDetected {sc['detected']} of {sc['total']} {src} (within "
+                     f"{sc['tolerance_minutes']} min). Alerts that follow no announcement: {sc['false_alerts']} "
+                     f"({sc.get('unlabeled_but_corroborated', 0)} corroborated by a change in non-chat actions, "
+                     f"{sc.get('unexplained', 0)} unexplained).\n")
+        al = cp["alerts"]
+        days = max(hours / 24, 1e-9)
+        kinds = Counter(a["why"] for a in al)
+        L.append(f"{len(al)} alerts in all ({len(al) / days:.2f} per day): "
+                 + ", ".join(f"{k} {v}" for k, v in kinds.most_common()) + ".\n")
+        shown = al if len(al) <= 15 else sorted(al, key=lambda a: -max(a["z_topic"], abs(a["z_volume"])))[:15]
+        if len(al) > 15:
+            L.append("The 15 strongest:\n")
+        L.append(_md_table(["alert (UTC)", "why", "z topic", "z volume", "new words", "non-chat actions changed"],
+                           [(_hm(a["t"]), a["why"], a["z_topic"], a["z_volume"], ", ".join(a["top_new_words"][:4]),
+                             "; ".join(a.get("corroborated_by", [])[:2]) or "-")
+                            for a in sorted(shown, key=lambda a: a["t"])]))
+        L.append("")
+    dl = cp.get("daily") or {}
+    if dl:
+        q = dl["params"]
+        L.append(f"**Day-level check** (for long logs). Each active day (at least {q['min_msgs']} agent messages) is "
+                 f"compared with the {q['ref_days']} active days before it; alert at z >= {q['z']}. "
+                 f"{len(dl['alert_days'])} alert days out of {dl['active_days']} active days.")
+        if dl.get("milestones"):
+            L.append(f"It flags **{dl['flagged']} of {dl['milestones']}** {getattr(log, 'milestone_source', None) or 'milestones'} "
+                     f"within their first {q['lag']} active days ({_pct(dl['recall'])}, against {_pct(dl['chance'])} "
+                     f"for any day), and {_pct(dl['precision'])} of its alert days fall in those windows."
+                     + (" It is slow, but when it fires it is usually a real change." if (dl.get("precision") or 0) >= 0.8 else "")
+                     + "\n")
+        else:
+            L.append("There are no milestones to score it against.\n")
+    tc = f.get("early_warning", {}).get("timestamp_crosscheck", {})
+    if tc.get("triggers"):
+        L.append("**False-alarm load of the Swarm Traces signals.** No covert channel is known in this village, "
+                 "so each firing is at best a lead for an investigator:\n")
+        tph = tc.get("triggers_per_hour", {})
+        L.append(_md_table(["signal", "firings", "per hour"],
+                           [(k, v, tph.get(k)) for k, v in sorted(tc["triggers"].items(), key=lambda x: -x[1])]))
+        L.append("")
+
+    # ---- authority
+    au = {r: v for r, v in (A.get("authority") or {}).items() if v.get("role_assigned_at")}
+    if au:
+        H("Authority mismatch (claims of a power that was not given)")
+        for role, r in au.items():
+            L.append(f"Role **{role}** was assigned at {_hm(r['role_assigned_at'])} UTC. Unassigned claimants: "
+                     f"**{r['unassigned_claimants']}**. `endorsers` = distinct agents who addressed the claimant "
+                     f"in a message that mentions the role.\n")
+            if r["claimants"]:
+                L.append(_md_table(["claimant", "assigned?", "first claim (UTC)", "claim msgs", "endorsers",
+                                    "hours to half", "endorsement via @"],
+                                   [(c["agent"], "yes" if c["assigned"] else "**no**", _hm(c["first_claim"]),
+                                     c["claim_messages"], c["endorsers"], c["endorsement_hours_to_half"],
+                                     _pct(c["endorsement_via_address"])) for c in r["claimants"]]))
+            L.append("")
+
+    # ---- actions and memory
+    ac = A.get("actions") or {}
+    rd = ac.get("role_drift") or {}
+    rb = ac.get("rule_breaks") or {}
+    has_rd = rd.get("statements", 0) >= 10
+    has_rule = bool(rb) and bool(au)
+    if has_rd or rb:
+        H("What agents believed and did (memories and computer use)")
+    if has_rd:
+        L.append("**Role drift.** When an agent quotes its own goal (\"Play your assigned role: ...\", "
+                 "\"Phase-2 role: ...\") in its memory or in a work-session goal, we compare the role it "
+                 "names with the role it was assigned. An alert fires when "
+                 f"{rd['params']['min_agents']} or more agents name a different role within "
+                 f"{rd['params']['window']} minutes.\n")
+        L.append(f"- {rd['statements']:,} statements by {rd['agents_with_statements']} agents; "
+                 f"{rd['mismatching']:,} name another role; {rd['agents_drifted']} agents drifted.")
+        if rd.get("alert"):
+            ba = rd.get("before_alert", {})
+            am = rd.get("after_milestone", {})
+            L.append(f"- **Alert at {_hm(rd['alert'])} UTC**"
+                     + (f", {am['delay_minutes']} min after operator message `{am['milestone']}` "
+                        f"({lab.get(am['milestone'], '')[10:60]}…)" if am else "")
+                     + (f", {rd['before_next_milestone_hours']} h before the next operator message"
+                        if rd.get('before_next_milestone_hours') else "") + ".")
+            L.append(f"- Before the alert window: {ba.get('mismatching', 0)} of {ba.get('statements', 0)} "
+                     "statements named another role.")
+            L.append("- First agents to drift: " + ", ".join(
+                f"{a} ({_hm(t)}, now names \"{r}\")" for a, t, r, _ in rd["first_mismatch"][:4]) + ".")
+        L.append("")
+    if has_rule:
+        role = next(iter(au))
+        L.append(f"**Rule breaks in actions.** Rule: only the {role} may edit code; everyone else acts "
+                 f"through the game's interface ({rb['interface_uses']:,} uses by {rb['interface_agents']} agents). "
+                 f"We read {rb['commands']:,} shell commands. A commit counts as code when it stages `.py` "
+                 "files, and as landed when its output shows the commit or push. This is a lower bound "
+                 "(`git add -A` names no files).\n")
+        rows = [(r["agent"], "yes" if r["privileged"] else "**no**",
+                 "yes" if r["agent"] in rb.get("unassigned_claimants", []) else "-",
+                 r["attempts"], r["landed"], _hm(r["first"]), ", ".join(f"`{x}`" for x in r["files"][:2]))
+                for r in rb["code"]]
+        if rows:
+            L.append(_md_table(["agent", f"assigned {role}?", f"claimed {role}?", "code commits tried", "landed",
+                                "first (UTC)", "files"], rows))
+        ws = rb.get("world_state") or []
+        L.append(f"\nCode reached the shared repository from {len(rb['code_landed_unprivileged'])} agents "
+                 f"who were not the assigned {role}"
+                 + (f": {', '.join(rb['code_landed_unprivileged'])}" if rb['code_landed_unprivileged'] else "")
+                 + f". Direct commits of the world-state file (bypassing the interface): "
+                 f"{sum(r['attempts'] for r in ws)} tried by {len(ws)} agents, {sum(r['landed'] for r in ws)} landed.\n")
+    elif rb:
+        L.append(f"**Actions.** We read {rb['commands']:,} shell commands ({rb['other_commits']:,} commits). This "
+                 "village assigns no privileged role, so there is no permission rule to check them against.\n")
+
+    # ---- blind spots
+    H("What an investigator would still miss")
+    pts = []
+    rc = (df.get("case_studies") or {}).get("role_confusion", {}).get("vs_control") if df else None
+    if rc:
+        drift_txt = (f" Their memories show it: the role-drift alert fires at {_hm(rd['alert'])} UTC."
+                     if rd.get("alert") else "")
+        pts.append("**Changes that never reach the chat.** After an operator message reassigned roles, "
+                   f"role-change messages went from {rc['before']['matching']} of {rc['before']['messages']} to "
+                   f"{rc['after']['matching']} of {rc['after']['messages']}: the agents did not discuss it."
+                   + drift_txt + " An investigator needs the agents' memories or goals, not only their messages.")
+    if not ms:
+        pts.append("**No ground truth for alerts.** Without rare operator announcements, nothing tells us which "
+                   "change-point alerts were real events; each one needs a human to read the chat around it.")
+    if au:
+        pts.append("**Claims are found by phrase.** The authority detector reads phrases such as \"X claims god\". "
+                   "An agent that acts with a power without saying so is missed.")
+    if rb:
+        pts.append("**What commands changed.** A commit made with `git add -A` does not name its files, so code "
+                   "edits are a lower bound. Screenshots are not used.")
+    else:
+        pts.append("**Actions are missing.** Without the computer-use turns we see what agents said they did, "
+                   "not what they did.")
+    if has_rd:
+        pts.append("**Role drift is found by phrase.** It needs an agent to quote its goal (\"assigned role: X\"); "
+                   "agents that switched without writing it down are missed.")
+    elif not ac.get("role_drift"):
+        pts.append("**Beliefs are missing.** Without agent memories we cannot compare what agents believe their "
+                   "goal is with what they were assigned.")
+    if nh:
+        pts.append(f"**Humans in the loop.** Humans wrote {nh:,} messages. We do not check whether a human "
+                   "message steered an agent (for example an instruction from a viewer), which is a known "
+                   "risk for agents that read untrusted text.")
+    pts.append("**`@name` is not the whole conversation.** Agents also reply without addressing anyone, so the "
+               "network undercounts who listened to whom.")
+    if top_room_share >= 0.9:
+        pts.append(f"**Mostly one room** ({_pct(top_room_share)} of messages), so there are few private side "
+                   "channels to find. Coordination here is open, not covert.")
+    L.append("\n\n".join(f"- {p}" for p in pts))
+    L.append("\nData: AI Village by AI Digest (research use; see `PROJECT_PLAN.md` for terms and all sources).")
+    return "\n".join(x for x in L if x is not None)
+
+
 def to_markdown(log: EventLog, f: dict) -> str:
+    if f.get("attributed"):
+        return _markdown_attributed(log, f)
     s, inf, res = f["summary"], f.get("inference", {}), f.get("research", {})
     L = []
     L.append(f"# SwarmScope findings: `{s['source']}`\n")

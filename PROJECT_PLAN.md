@@ -28,15 +28,16 @@ We also test whether the tool **could have flagged the coordination early**. The
 | Swarm Traces analysis, report, dynamic viewer | Done. See `outputs/swarm_traces/`. |
 | Fixes for the 3 blind spots (authors, time, aliases) | Done. Each fix has a held-out accuracy test (§7). |
 | Researcher metrics from the reading list | Done (§8). |
-| Code review | Done. 6 bugs fixed (§10). |
-| AI Village | **Blocked.** The dataset is gated. You must accept its terms on Hugging Face first, then run `scripts/download_ai_village.py`. |
+| Code review | Done. 6 bugs fixed (§11). |
+| AI Village, all 4 villages | Done for `swarm-village` (all tables) and, as control logs, `game-jam-village` (all tables), `open-chat-village` and `main-village` (chat, events and session tables; their memories and computer-use turns, 1.5 GB and 7.2 GB, are not downloaded). Cross-village comparison in §10.7.
+| AI Village (`swarm-village`) | Done. Downloaded after accepting the terms (core tables plus computer-use turns and agent memories, kept out of git). New detectors for logs with named speakers: conversation network, information diffusion, change points, authority mismatch, role drift and rule breaks in actions (§10). See `outputs/ai_village_swarm-village/`. |
 
 ## 4. Data
 
 | Source | What it gives us | Main limit |
 |---|---|---|
 | **Swarm Traces** [D1] (`Swarm-Traces-Data/redacted.jsonl.gz`, 189,579 records) | Payloads, decoded layers and responses from the swarm that attacked Hugging Face in July 2026. | The `agent_id` field is redacted. Only 3.1% of records have a trusted date. About 80% of the data is outbound. |
-| **AI Village** [D2] | Attributed chat with speaker, room and time. A mostly benign control log, which we can use to measure false alarms. | Gated. You must accept the research terms first. |
+| **AI Village** [D2] | `swarm-village`: 133 agents (all GLM-5.3-Flash), 24.3 h on 29–30 Aug 2026, 3,853 chat messages plus 3,305 non-chat actions, with speaker, room, time and each agent's assigned role. Mostly benign, so it is a control log for false alarms; it also holds one real incident (an operator error, §10). | Research terms: no re-identification, cite AI Digest. We also use the computer-use turns (59,531 turns, 51,911 shell commands with output) and the agent memories (2,983 entries); the 790 MB of screenshots are not used. |
 | **Transluce agent activity** [D3] | 6,467 strong-evidence reports of agent activity on urlquery.net (Mar–Sep 2026). | Not scoped yet. |
 | **METR / Redwood incident report** [D4] | The timeline that we use as ground-truth milestones. | Times are approximate. |
 
@@ -59,10 +60,10 @@ The tool weights each shared resource by its rarity: a resource used by k agents
 log ─► loader ─► events ─► inference (authors, dates, aliases) ─► graphs ─► detectors + researcher metrics ─► report.md + findings.json + viewer.html
 ```
 
-1. **Loader.** `swarm_traces`, `ai_village`, or `generic` (any JSONL file plus a field map). Each one turns a record into an `Event`. An event holds who did it, the channel, the resources it touched, its mechanism flags, and its time. Observed and inferred values are always kept in separate fields.
+1. **Loader.** `swarm_traces`, `ai_village` (the Hugging Face tables: agents, rooms, chat messages, actions, role assignments; operator messages become milestones), or `generic` (any JSONL file plus a field map). Each one turns a record into an `Event`. An event holds who did it, the channel, the resources it touched, its mechanism flags, and its time. Observed and inferred values are always kept in separate fields.
 2. **Inference** (§7). Fill in missing authors and dates, and find alias candidates. Each step measures its own error on held-out data.
 3. **Graphs.** An *activity graph* (agents and resources) and an *agent graph* (agent to agent, Adamic–Adar ties).
-4. **Detectors.** Shared dead-drops, covert-channel inventory, and an early-warning replay on the real clock.
+4. **Detectors.** Shared dead-drops, covert-channel inventory, and an early-warning replay on the real clock. For logs where most events name their author (AI Village), the tool skips inference and adds four detectors (§10): conversation network by phase, information diffusion, online change points, and authority mismatch.
 5. **Researcher metrics** (§8).
 6. **Viewer.** One HTML file with a **real-clock axis** (incident week or all dates) and a **discovery-order axis** (all events, not a clock). It has play/pause, Activity and Coordination views, inferred edges drawn dashed, METR milestones on the timeline, and node details (role, tactics, leader and broker scores).
 
@@ -151,7 +152,8 @@ We also fixed one name-parsing case. `MODAL` marks work in the Modal sandbox, an
 | Stackelberg attacks [R14]; mediated MARL [R13] | Who leads, who brokers? | **Leaders** (first to a shared resource, on the real clock) and **brokers** (betweenness [M14]) | Leader GEOS33474 (68 followers, median lag 10 h). Top broker AIC50. |
 | Greenblatt et al. [R8] (AI Control) | How small an audit budget catches most coordination? | **Audit-budget curve** | Auditing the top 4.2% of agents covers 50% of strong ties. 19.6% of agents cover 80%. |
 | Motwani et al. [R6] (secret collusion) | What hidden channels exist? | **Covert-channel inventory** | Shortener chains 37,430; image read-back 9,038; board 1,936; mailboxes 788; signed commands 439; DNS 142. |
-| Riedl [R11] (emergent coordination) | Is the group more than a sum of agents? | *Planned.* Time-delayed mutual information needs a dense time series, which AI Village has. | Not run yet. |
+| Riedl [R11] (emergent coordination) | Is the group more than a sum of agents? | *Planned.* Time-delayed mutual information needs a dense time series, which AI Village has. | Not run yet (§13). |
+| Hammond et al. [R1] (emergent agency); Greenblatt et al. [R8] | Does the group hand power to an agent that was not given it? | **Authority mismatch** (§10) | AI Village: an unassigned agent claimed the privileged role, and 73 of 133 agents then addressed it in that role. |
 | Rose et al. [R7] (interpretability) | — | Needs model internals. We use logs only, so the two approaches complement each other. | — |
 | Foerster et al. [R12] (CaMeL for computer use) | Where does untrusted data steer actions? | The info-spread traces are a provenance view. | — |
 
@@ -175,11 +177,159 @@ These figures come from the strict replay: only dates and names read from the da
 
 Both multi-agent signals fire 63–64 days before public discovery (2026-09-11).
 
-The *private channel* signal is a non-task resource used repeatedly (6 or more signed events) by a closed group of 2–3 agents. On synthetic logs (100 seeds) it has 100% recall, 0% early fires and 0% false alarms. That is an easy test. The real false-alarm rate needs AI Village.
+The *private channel* signal is a non-task resource used repeatedly (6 or more signed events) by a closed group of 2–3 agents. On synthetic logs (100 seeds) it has 100% recall, 0% early fires and 0% false alarms. That is an easy test. On the benign AI Village swarm it fires 14 times in 24.3 h (0.58 per hour), so the real false-alarm rate is not zero (§10.4).
 
 The extended replay (which adds inferred dates and names) moves some signals weeks earlier. Each of those moves rests on a few inferred dates, so treat it as a lead to check, not a result.
 
-## 10. Code review (2026-11-07): what was wrong and is fixed
+## 10. AI Village: named speakers, a benign swarm, one real incident
+
+`swarm-village` [D2] is the opposite of Swarm Traces: every message names its speaker and has a time, and the swarm did ordinary work. 133 agents first built an "Earth" simulation together (a shared repository with `OWNERS.md`, `ROLES.md`, `world.json`), then from 10:00 UTC on 30 Aug each agent role-played an assigned role (ministers, judges, one "god" who alone may edit the code). The operators (humans) posted 5 messages; we use them as ground-truth milestones.
+
+So here we do not need inference. A message that writes `@name` is an edge from the speaker to that agent. We added four detectors for logs like this (`swarmscope/detectors/`).
+
+### 10.1 Who talked to whom (`conversation.py`)
+
+Attention **Gini** [M19] (0 = everyone is addressed equally, 1 = one agent gets everything) and **reciprocity** (share of addressed pairs that answer back), per phase between operator messages:
+
+| phase | @-addresses per hour | reciprocity | Gini | top hub |
+|---|---|---|---|---|
+| Build (21:46–10:07) | 122 | 0.40 | 0.43 | amber-gamma (78) |
+| Role-play starts (10:07–12:50) | 243 | **0.20** | **0.60** | **coral-delta (84)** |
+| After the role shuffle (12:50–21:01) | 334 | 0.40 | 0.43 | coral-delta (224) |
+
+When role-play starts, the group centralises fast: attention becomes more unequal and fewer addresses are answered. The new hub, coral-delta, is not the assigned god (§10.5). Over the whole run, 30.8% of addresses get an answer within 6 h (median 27.5 min). Top broker by betweenness [M14]: coral-delta.
+
+### 10.2 How information spread (`diffusion.py`)
+
+For each item (a file name, a commit hash, or a coined identifier) we take each agent's first use. Each adopter's *probable source* is the earlier user who most recently `@`-addressed it, else the latest earlier user. This is an exposure model of a cascade [M16].
+
+| item | first agent | agents reached | hours to half | source was an `@`-address |
+|---|---|---|---|---|
+| `OWNERS.md` | amber-lambda | 117 | 3.9 | 25% |
+| commit `a484c70d` | red-kappa | 40 | **0.23** | 85% |
+| coined term `eat-first` | teal-theta | 105 | 4.8 | 91% |
+| coined term `same-tick` | pearl-lambda | 89 | 6.6 | 85% |
+
+Commits spread in minutes and mostly by direct address; shared files spread over hours and mostly by being seen in the room.
+
+### 10.3 Could it have flagged the change early? (`changepoint.py`)
+
+Every 10 minutes the detector compares the last 30 minutes of chat with the 120 minutes before, on **topic** (Jensen–Shannon divergence of word counts [M17]) and **volume** (log rate ratio). Each is turned into a robust z-score (median and MAD) against its own past, and an alert fires at |z| ≥ 3.5 [M18]. It uses only the past at each step.
+
+| operator message | detected? | delay |
+|---|---|---|
+| 10:07 phase 2 begins | yes (topic z = 8.9) | 18 min |
+| **12:50 role assignment fires again by mistake** | **no** | — |
+| 21:01 check-in | no | — |
+| 21:19 apology and fix | no | — |
+
+Two alerts follow no operator message. One (08:26) is backed by independent evidence: memory consolidations drop from 143 to 6 per hour and searches stop. The other (02:16, a volume surge) is unexplained. The results are the same for z from 3.0 to 4.0.
+
+**The incident it missed.** At 12:50 an operator script re-ran and gave every agent a new role. The only sign in the chat was a second copy of the phase-2 announcement. The operators announced the fix at 21:19, 8.5 hours later. The agents did not react: messages about a role change went from 12 of 595 (2.0%) in the window before to 1 of 521 (0.2%) after, and any mention of "role" fell from 32% to 6%. (Role talk also fades once roles settle, so the drop proves nothing; but a change the agents noticed would give a rise.) This is a blind spot of every chat-only monitor: a goal change that agents accept silently.
+
+### 10.4 False alarms of the Swarm Traces signals
+
+The swarm was benign, so every firing of the signals we built for Swarm Traces is a false alarm here (24.3 h):
+
+| signal | firings | per hour |
+|---|---|---|
+| shared resource (`shared_deaddrop`) | 183 | 7.5 |
+| signed command | 18 | 0.74 |
+| private channel | 14 | 0.58 |
+| board | 7 | 0.29 |
+| duplicate control | 1 | 0.04 |
+
+In a collaborative swarm, sharing a file is normal work. The structure-only signals must be read with the context of what the swarm was asked to do.
+
+### 10.5 Authority mismatch (`authority.py`)
+
+AI Village stores each agent's assigned role. We look for agents that **claim a privileged role they were not given**, and for an **endorsement cascade**: other agents addressing the claimant in that role. This is privilege escalation by consent: no agent breaks in; the group grants the power [R1].
+
+| claimant | assigned god? | first claim (UTC) | agents who then addressed it as god | hours to half |
+|---|---|---|---|---|
+| **coral-delta** (assigned Minister of Education) | **no** | 11:08 ("claims god (emergency protocol)") | **73** | 4.1 |
+| ruby-theta | no | 11:09 | 18 | 0.5 |
+| jade-theta | no | 10:51 | 5 | 0.1 |
+| ruby-alpha | no | 11:13 | 3 | 0.1 |
+| green-epsilon | **yes** | 10:47 | 44 | 5.5 |
+
+The false god got more followers than the real one, and then ran a "god desk" (a background process, mass revives, archiving). The detector flags the claim at 11:08, 21 minutes after the assigned god's own claim.
+
+**Precision check.** We read every match by hand. The first pattern also matched petitions *to* the god desk ("god desk … (me)"): 5 of 14 matches were false. A filing field "agent=god" was a sixth. The current pattern keeps only self-claims; all 5 remaining claimants are real. A claim made without these phrases would be missed.
+
+### 10.6 What agents believed and did (`actions.py`)
+
+Chat shows what agents *say*. Two more tables show what they *believe* (memories and the goal of each work session) and what they *do* (every shell command, with its output).
+
+**Role drift.** When an agent quotes its own goal in its memory ("Play your assigned role: Bridge Engineer", "Phase-2 role: ..."), we compare the role it names with the role it was assigned. An online alert fires when 3 or more agents name a different role within 30 minutes.
+
+| | statements | name another role |
+|---|---|---|
+| before the alert | 208 | **0** |
+| whole run | 984 (121 agents) | 512 (76 agents) |
+
+The alert fires at **13:02 UTC, 12 minutes after the erroneous reshuffle** and 8.3 hours before the operators announced the fix. We read 10 random matches after 12:50: all 10 were real. Many agents wrote down both roles, for example: *System goal now reads: "Play your assigned role: Bridge Engineer" … my prior Phase-2 draw …*. So the agents noticed the change privately, and none of them raised it in the chat (§10.3).
+
+A first, looser pattern (any "role:" mention) was much worse: before 12:50 all 8 sampled matches were notes about code ("role contains insurance/underwriter"). Only statements that quote the agent's own goal are reliable. "god" is left out, because every memory repeats the rule "only god may edit code".
+
+**Rule breaks in actions.** In phase 2 only the god may edit code; everyone else acts through `./earth act` (2,280 uses by 131 agents). We count commits that stage `.py` files, and treat one as landed when its output shows the commit or the push.
+
+| agent | assigned god? | claimed god? | code commits tried / landed | files |
+|---|---|---|---|---|
+| coral-delta | no | yes | 5 / 1 | `modules/agriculture/agriculture.py`, `modules/almanac/almanac.py` |
+| amber-zeta | no | no | 1 / 1 | `modules/economy/market.py` |
+| amber-beta | no | no | 1 / 1 | `modules/economy/market.py` |
+| coral-alpha | no | no | 1 / 1 | `tools/tax_ledger.py` |
+| green-epsilon | **yes** | — | 1 / 0 | `earthsim/engine.py` |
+
+So code reached the shared repository from 4 agents who were not the assigned god, and none from the assigned god after 10:00. The work-session goals show the power transfer behind this: green-epsilon calls itself "God Emeritus" from 11:37, and coral-delta's goals read "God duties" from 13:02. Direct commits of the world-state file, bypassing `./earth act`: 26 tried by 18 agents, 6 landed (13 of the 26 tries fall in the five minutes 17:03–17:07, by 13 different agents). This count is a lower bound: a commit made with `git add -A` does not name its files.
+
+### 10.7 The other three villages (control logs)
+
+The AI Village dataset [D2] has four villages. `swarm-village` is the only one with an incident we know of. The other three show how the detectors behave on different swarms, and how often they fire when nothing is known to be wrong.
+
+| village | agents | humans | days | what it is |
+|---|---|---|---|---|
+| `swarm-village` | 133 (one model) | 1 operator | 1.0 | build a world, then role-play (§10.1–10.6) |
+| `game-jam-village` | 6 (Claude Fable 5, GPT-5.6 Sol) | 3 operators | 3.1 | build a game together |
+| `open-chat-village` | 23 models | 436 viewers | 66 | no shared goal; members of the public chat with the agents |
+| `main-village` | 58 models | 602 | 576 | the long-running village, 51 goals since April 2025 |
+
+Full table: `outputs/ai_village_comparison.md` (`python scripts/compare_villages.py`).
+
+**1. What changed in the tool so it works on all four.**
+- *Names with spaces.* "Claude Fable 5: Agent 1" cannot be read as one `@token`. The loader now matches `@<full name>`, and `@Agent 1` when only one agent has that suffix.
+- *Milestones.* Human messages count as operator announcements only when they are rare (60 or fewer). Copies posted in several rooms, and nudges to single agents ("@Agent 3, you have been pausing"), are dropped: game-jam has 5 announcements and 27 nudges. Where humans chat a lot, the start of each new village goal is the milestone instead (main-village: 50).
+- *Daily schedules.* Open-chat runs on weekdays, 9am–5pm Pacific. The 30-minute detector alerted at almost every opening (78 alerts). For logs longer than 3 days it now compares each step with the same hour on earlier days, and skips steps where a window is empty: 23 alerts in 66 days.
+- *Speed.* The change detector now slides its windows instead of rescanning every message. Main village (215,755 messages) runs in about 4 minutes.
+- *Report.* Every section is built from the village's own data and appears only when it applies (no god role, no memories, and so on).
+
+**2. Can it flag a change early, outside the swarm incident?** Main village gives 49 scorable goal changes:
+
+| detector | goal changes flagged | same rate for a random time | alerts |
+|---|---|---|---|
+| 30-minute (§10.3), within 24 h | 33% | 20% | 126 in 576 days |
+| 30-minute, topic alerts only, within 24 h | 2% | 4% | 23 |
+| **day-level** (each active day vs the 3 before), within 2 active days | **35% (17 of 49)** | 9% | 20 alert days of 421 |
+
+The 30-minute detector is near chance here: a new goal changes the talk over a whole day, not in half an hour. We added a day-level check (`changepoint.daily_topic`). It finds about a third of goal changes, and **19 of its 20 alert days (95%) fall within the first two active days of a new goal**. So it misses many changes, but when it fires it is almost always right. In open-chat (no goals to score against) it fires on 1 day of 49.
+
+**3. False alarms of the Swarm Traces signals.** No covert channel is known in any of these villages, so every firing is at most a lead:
+
+| village | private channel / h | shared resource / h |
+|---|---|---|
+| `game-jam-village` (6 agents) | **1.32** | 3.19 |
+| `swarm-village` (133) | 0.58 | 7.54 |
+| `open-chat-village` (23) | 0.33 | 1.88 |
+| `main-village` (58) | 0.09 | 0.56 |
+
+The private-channel signal (a resource used by a closed group of 2–3 agents) fires most in the smallest team: with 6 agents, almost any shared file is "private". It only makes sense in a large swarm, and its threshold should scale with the number of agents.
+
+**4. Who talks to whom.** Game-jam agents almost never use `@` (10 addresses in 3 days), so its conversation network is empty: they name each other without `@`. In main-village, 81% of addressed pairs answer each other back, against 27% in open-chat, where most pairs involve a viewer. Attention Gini is computed over AI agents only, because hundreds of viewers who speak once and are never addressed would push it to 1.
+
+**5. What we still cannot check.** Open-chat has 12,264 messages from members of the public. Whether a viewer's message steered an agent (an instruction, a prompt injection) is a real risk for agents that read untrusted text, and SwarmScope does not measure it yet. The memories and computer-use turns of open-chat and main (8.7 GB together) would allow the role-drift and rule-break checks there too.
+
+## 11. Code review (2026-11-07): what was wrong and is fixed
 
 1. **Over-broad mechanism patterns.** For example, "elect" matched `querySelector` and "signature" matched every AWS-signed request. Corrected counts: duplicate control 4,919 → 312, signed commands 2,444 → 439, DNS exfiltration 791 → 142.
 2. **The Artifactory board counted as a container registry.** So 214 agents got the role "Persistence". This is fixed.
@@ -187,8 +337,11 @@ The extended replay (which adds inferred dates and names) moves some signals wee
 4. **The burst detector could never fire.** It used windows with an equal number of events. It now uses hourly counts on the real clock.
 5. **The tie test treated all resources as equally likely.** So hubs looked significant (3,185 "validated" ties). It now uses a null model that accounts for resource popularity.
 6. **Every named agent got a Command-and-Control role.** Board tokens are how agents get named, so the flag is now left out of each agent's profile.
+7. **AI Village: short agent names lost.** The loader dropped `@`-addresses to agent names shorter than 3 characters (for example `@o3`). All names can now be addressed; only the search for names written without `@` needs 3+ characters.
+8. **AI Village: times lost on Python 3.10.** Python 3.10 reads only 3 or 6 decimal places in a timestamp. 691 of 7,158 events (9.7%) had 4 or 5, so they lost their time and the Mac run gave different numbers (3 god claimants instead of 4). The loaders now pad the decimals; a test covers it.
+9. **AI Village: secrets in goal text.** One goal text holds a webhook URL. Every text is masked (long letter-digit URL parts) before it is stored or written out.
 
-## 11. What an investigator would still miss
+## 12. What an investigator would still miss
 
 1. **Most authors.** 1.3% of events are named after inference. 56% are in personas, but most personas are anonymous.
 2. **Most times.** 10.6% of events are dated after inference. The dated subset may not represent the whole swarm.
@@ -197,20 +350,22 @@ The extended replay (which adds inferred dates and names) moves some signals wee
 5. **Content of encrypted channels.** We see that a channel existed, not what it carried.
 6. **Intent.** The graph shows structure, not purpose. Every alert is a lead for a human.
 7. **Direction through dead-drops.** We cannot prove that one agent read another's bytes.
-8. **Real false-alarm rates.** These are not measured until the AI Village run.
+8. **Real false-alarm rates are high for the broad signals.** On the benign AI Village swarm, `shared_deaddrop` fires 7.5 times per hour and `private_channel` 0.58 times per hour (§10.4). An alert needs a human to check it.
+9. **Silent goal changes, if you only read the chat.** In AI Village an operator script reassigned every role by mistake. The agents did not talk about it and the chat detectors did not fire (§10.3). Their memories did show it, within 12 minutes (§10.6). So an investigator needs the agents' memories or goals, and in many deployments these are not logged.
+10. **Role drift needs the agent to write its goal down.** Agents that switched role silently, or used an abbreviation, are missed.
 
-## 12. Next steps
+## 13. Next steps
 
-1. **AI Village as the control log.** Accept the terms, download `swarm-village`, and run the tool. This gives the first real false-alarm rates, and lets us add Riedl's time-delayed mutual-information test [R11].
+1. **AI Village, next steps.** Compare each agent's actions with its role (does the Minister of Agriculture act on farms?), not only its stated role. Add a check for human influence in open-chat (did a viewer's message change what an agent did?). Scale the private-channel threshold with swarm size. Add Riedl's time-delayed mutual-information test [R11].
 2. **Harder synthetic tests.** Plants inside popular resources, rotating aliases, groups larger than 3.
 3. **Use the gzip and JWT times** if unredacted access becomes available. This removes most of the dating inference.
 4. **Deploy.** Publish the viewer, then add a small upload page: drop in a JSONL log, map its fields, and get the viewer back.
 
-## 13. References
+## 14. References
 
 **Data and incident reports**
 - [D1] Swarm Traces (2026). Report: https://swarmtraces.org/ · Evidence viewer: https://swarmtraces.org/viewer/ · Dataset: https://swarmtraces.org/data/final/redacted.jsonl.gz
-- [D2] AI Digest. AI Village dataset (gated; research terms). https://huggingface.co/datasets/aidigestorg/ai-village
+- [D2] AI Digest. AI Village dataset (gated; research terms; we used the `swarm-village` folder). https://huggingface.co/datasets/aidigestorg/ai-village · Project page: https://theaidigest.org/village · Overview: https://theaidigest.org/village/blog/what-we-learned-2025
 - [D3] Transluce (2026). Early rogue AI agent activity and attempts to hack found on urlquery.net. https://transluce.org/agent-activity
 - [D4] METR / Redwood Research (Aug 2026). Independent investigation of the OpenAI / Hugging Face incident. https://metr.org/hugging-face-incident-report-aug-2026.pdf
 
@@ -248,12 +403,16 @@ The extended replay (which adds inferred dates and names) moves some signals wee
 - [M13] Benjamini & Hochberg (1995). Controlling the false discovery rate. *JRSS B* 57(1). https://doi.org/10.1111/j.2517-6161.1995.tb02031.x
 - [M14] Brandes (2001). A faster algorithm for betweenness centrality. *J. Mathematical Sociology* 25(2). https://doi.org/10.1080/0022250X.2001.9990249
 - [M15] Raghavan, Albert & Kumara (2007). Near linear time algorithm to detect community structures (label propagation). *Phys. Rev. E* 76. https://doi.org/10.1103/PhysRevE.76.036106
+- [M16] Goel, Watts & Goldstein (2012). The structure of online diffusion networks. ACM EC 2012. https://doi.org/10.1145/2229012.2229058 · PDF: https://5harad.com/papers/diffusion.pdf
+- [M17] Lin (1991). Divergence measures based on the Shannon entropy (Jensen–Shannon divergence). *IEEE Trans. Information Theory* 37(1). https://doi.org/10.1109/18.61115
+- [M18] Aminikhanghahi & Cook (2017). A survey of methods for time series change point detection. *Knowledge and Information Systems* 51. https://doi.org/10.1007/s10115-016-0987-z · https://pmc.ncbi.nlm.nih.gov/articles/PMC5464762
+- [M19] Gini coefficient (as a measure of how concentrated attention is). Gini (1912), *Variabilità e mutabilità*; overview: https://en.wikipedia.org/wiki/Gini_coefficient
 
 **Taxonomy and tools**
 - [T1] MITRE ATT&CK. https://attack.mitre.org/ · techniques used: [T1102.001 Dead Drop Resolver](https://attack.mitre.org/techniques/T1102/001/), [T1102 Web Service](https://attack.mitre.org/techniques/T1102/), [T1048 Exfiltration Over Alternative Protocol](https://attack.mitre.org/techniques/T1048/), [T1525 Implant Internal Image](https://attack.mitre.org/techniques/T1525/), [T1613 Container and Resource Discovery](https://attack.mitre.org/techniques/T1613/), [T1070 Indicator Removal](https://attack.mitre.org/techniques/T1070/), [T1552 Unsecured Credentials](https://attack.mitre.org/techniques/T1552/), [T1572 Protocol Tunneling](https://attack.mitre.org/techniques/T1572/), [T1027 Obfuscated Files or Information](https://attack.mitre.org/techniques/T1027/), [T1078 Valid Accounts](https://attack.mitre.org/techniques/T1078/)
 - [T2] D3.js v7.9.0 (inlined in the viewer). https://d3js.org/
 
-## 14. How to run
+## 15. How to run
 
 ```bash
 # Swarm Traces (about 1 minute; Python 3.9+, standard library only)
@@ -263,9 +422,11 @@ python -m swarmscope.cli analyze Swarm-Traces-Data/redacted.jsonl.gz \
 # Accuracy of each inference preset (a few minutes)
 python scripts/sweep_inference.py Swarm-Traces-Data/redacted.jsonl.gz
 
-# AI Village (after accepting the terms and running the download script)
-python -m swarmscope.cli analyze data/ai-village/swarm-village \
-    --format ai_village --out outputs/ai_village_swarm-village
+# AI Village (after accepting the terms; download with scripts/download_ai_village.py or the browser)
+for v in swarm-village game-jam-village open-chat-village main-village; do
+  python -m swarmscope.cli analyze data/ai-village/$v --format ai_village --out outputs/ai_village_$v
+done
+python scripts/compare_villages.py      # one table across villages
 
 # Any JSONL log
 python -m swarmscope.cli analyze my_log.jsonl --format generic \

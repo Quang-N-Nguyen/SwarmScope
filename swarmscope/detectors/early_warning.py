@@ -68,7 +68,12 @@ def replay(log: EventLog, prefer_time: bool = True) -> dict:
     shared_dd = 0
     cum_pairs = 0
 
-    def fire(sig, pos, e):
+    # Every distinct trigger, not just the first: (signal -> set of keys).
+    # The count is what an analyst would have to review, i.e. the alert load.
+    triggers: Dict[str, set] = defaultdict(set)
+
+    def fire(sig, pos, e, key=None):
+        triggers[sig].add(key if key is not None else e.event_id)
         if sig not in first_fire:
             first_fire[sig] = dict(pos=pos, frac=round(pos / n, 4),
                                    event_id=e.event_id, ts=e.ts)
@@ -89,19 +94,19 @@ def replay(log: EventLog, prefer_time: bool = True) -> dict:
             k = len(res_agents[r])
             if (2 <= k <= PRIVATE_MAX_AGENTS and res_attr[r] >= PRIVATE_MIN_EVENTS
                     and res_task[r] / res_n[r] < 0.5):
-                fire("private_channel", pos, e)
+                fire("private_channel", pos, e, key=r)
             if before < 2 <= len(res_agents[r]):
                 shared_dd += 1
-                fire("shared_deaddrop", pos, e)
+                fire("shared_deaddrop", pos, e, key=r)
                 # Same signal, but only if what we have seen of this resource
                 # so far is mostly NOT the task's own API. Uses past data only.
                 if res_task[r] / res_n[r] < 0.5:
-                    fire("shared_deaddrop_nontask", pos, e)
+                    fire("shared_deaddrop_nontask", pos, e, key=r)
         # credential reuse
         for c in e.ref_list("credential"):
             cred_events[c] += 1
             if cred_events[c] == 2:
-                fire("credential_reuse", pos, e)
+                fire("credential_reuse", pos, e, key=c)
         # board / mailbox
         if e.has("board_token") or e.has("mailbox"):
             fire("board", pos, e)
@@ -131,6 +136,7 @@ def replay(log: EventLog, prefer_time: bool = True) -> dict:
         axis=log.time_axis(prefer_time),
         n_events=n,
         per_signal_first_fire=first_fire,
+        triggers={s: len(v) for s, v in triggers.items()},
         combined_first_alert=alert,
         total_shared_deaddrops=shared_dd,
         reach_curve=reach_curve,
@@ -145,7 +151,8 @@ def timestamp_crosscheck(log: EventLog, include_inferred: bool = False) -> dict:
     Extended: also chain-inherited and inferred dates, and inferred authors.
     """
     import dataclasses
-    ok = ("embedded", "chain", "inferred") if include_inferred else ("embedded",)
+    # "native" = the log's own timestamps (attributed logs such as AI Village).
+    ok = ("embedded", "native", "chain", "inferred") if include_inferred else ("embedded", "native")
     timed = [e for e in log.events if e.ts is not None and e.ts_source in ok]
     if len(timed) < 20:
         return dict(n_timed=len(timed), note="too few timestamped events for a time-based check")
@@ -163,7 +170,11 @@ def timestamp_crosscheck(log: EventLog, include_inferred: bool = False) -> dict:
         if not ts:
             return None
         return _dt.datetime.fromtimestamp(ts, _dt.timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-    out = dict(n_timed=len(timed), axis="time", include_inferred=include_inferred, signals={})
+    hours = (copies[-1].ts - copies[0].ts) / 3600 or 1.0
+    out = dict(n_timed=len(timed), axis="time", include_inferred=include_inferred, signals={},
+               hours=round(hours, 1),
+               triggers=r.get("triggers", {}),
+               triggers_per_hour={k: round(v / hours, 2) for k, v in r.get("triggers", {}).items()})
     by_id = {e.event_id: e for e in copies}
     for s, v in r["per_signal_first_fire"].items():
         ev = by_id.get(v["event_id"])

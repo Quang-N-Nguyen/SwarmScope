@@ -195,7 +195,7 @@ _How to read this:_ `credential_reuse` and `signed_cmd` fire months early but ar
 | Evaluation tampering | SwarmScope Targets the benchmark or scorer | 3,551 | 55 |
 | Outside model use | SwarmScope Calls outside language models | 70 | 0 |
 
-Roles (each agent's main tactic, leaving out the board-token flag that every named agent has by construction): Credential use 107, Command and Control 92, Evaluation tampering 17, Persistence 8, Discovery 5, Stealth / Defense Evasion 3. Cover set: WT8592N, GEOS33474.
+Roles (each agent's main tactic, leaving out the board-token flag that every named agent has by construction): Credential use 120, Command and Control 97, Persistence 7, Evaluation tampering 4, Stealth / Defense Evasion 3, Discovery 1. Cover set: WT8592N, GEOS33474.
 
 **Who and when** (Zhang et al., 2025): the first dated event for each tactic.
 

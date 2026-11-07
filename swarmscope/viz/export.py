@@ -38,6 +38,63 @@ def _utc(ts):
     return _dt.datetime.fromtimestamp(ts, _dt.timezone.utc)
 
 
+def _forensics(log: EventLog, findings: dict) -> Optional[dict]:
+    """Time series for the forensics charts (logs with named speakers only).
+
+    * cp      -- change detector: z-scores of topic and volume every 10 min, alerts
+    * claims  -- cumulative agents addressing each god-role claimant
+    * spread  -- cumulative adopters of the top file, commit and coined term
+    * roles   -- share of agent chat messages that mention "role", per 30 min
+    """
+    import re
+    A = findings.get("attributed") or {}
+    if not A:
+        return None
+    cp = A.get("changepoint") or {}
+    out = dict(
+        cp=dict(z=(cp.get("params") or {}).get("z"),
+                series=[(r["t"], r["z_topic"], r["z_volume"]) for r in cp.get("series", [])],
+                alerts=[a["t"] for a in cp.get("alerts", [])]),
+        claims=[], spread=[], roles=[])
+    for r in (A.get("authority") or {}).values():
+        rows = sorted(r["claimants"], key=lambda c: -c["endorsers"])[:3]
+        for c in rows:
+            out["claims"].append(dict(name=c["agent"] + (" (assigned god)" if c["assigned"] else " (not assigned)"),
+                                      times=c.get("endorsement_times", [])))
+    df = A.get("diffusion") or {}
+    for kind, label in (("files", "file"), ("commits", "commit"), ("terms", "term")):
+        top = (df.get(kind) or [])[:1]
+        for it in top:
+            out["spread"].append(dict(name=f"{label} {it['item'][:24]}", times=it.get("times", [])))
+    dl = cp.get("daily") or {}
+    if dl.get("series"):
+        out["daily"] = dict(series=dl["series"], alerts=dl.get("alert_days", []), z=dl["params"]["z"],
+                            ref_days=dl["params"]["ref_days"], lag=dl["params"]["lag"], flagged=dl.get("flagged"),
+                            milestones=dl.get("milestones"), recall=dl.get("recall"), chance=dl.get("chance"),
+                            precision=dl.get("precision"))
+    # long logs: thin the 10-minute series to at most ~3,000 points for the chart
+    if len(out["cp"]["series"]) > 3000:
+        k = len(out["cp"]["series"]) // 3000 + 1
+        out["cp"]["series"] = out["cp"]["series"][::k]
+    rd = ((A.get("actions") or {}).get("role_drift") or {})
+    if rd.get("series"):
+        out["drift"] = dict(series=[(t, n, m) for t, n, m in rd["series"] if n >= 3], alert=rd.get("alert"),
+                            agents=rd.get("agents_drifted"), before=rd.get("before_alert"))
+    if not ((A.get("diffusion") or {}).get("case_studies") or {}).get("role_confusion"):
+        return out          # no role reassignment to look at: skip the role-talk chart
+    rx = re.compile(r"\broles?\b")
+    B = 1800
+    buckets: Dict[int, list] = defaultdict(lambda: [0, 0])
+    for e in log.timed_events():
+        if e.kind == "chat" and e.actor and not e.actor.startswith("human:"):
+            b = buckets[int(e.ts // B)]
+            b[0] += 1
+            if rx.search(e.meta.get("text_lc") or ""):
+                b[1] += 1
+    out["roles"] = [((k * B) + B / 2, round(v[1] / v[0], 3), v[0]) for k, v in sorted(buckets.items()) if v[0] >= 10]
+    return out
+
+
 def build_graph_data(log: EventLog, findings: Optional[dict] = None,
                      prefer_time: bool = True, top_resources: int = 120) -> dict:
     findings = findings or {}
@@ -50,6 +107,21 @@ def build_graph_data(log: EventLog, findings: Optional[dict] = None,
 
     maxpos = max([n["last_pos"] for n in act.nodes.values()] + [1])
 
+    # Named-speaker logs: all agents share one public room, so communities are
+    # trivial (one group). Colour by authority status instead and show each
+    # agent's assigned role: 0 = other, 1 = claimed a privileged role it was
+    # not given, 2 = assigned holder of that role.
+    attributed = bool(findings.get("attributed"))
+    status: Dict[str, int] = {}
+    goal_now: Dict[str, str] = {}
+    if attributed:
+        for r in (findings["attributed"].get("authority") or {}).values():
+            for c in r["claimants"]:
+                status["agent:" + c["agent"]] = 2 if c["assigned"] else 1
+        for a, gl in (getattr(log, "agent_goals", {}) or {}).items():
+            if gl:
+                goal_now["agent:" + a] = gl[-1][1].split("—")[0].strip()[:40]
+
     # ---- nodes
     nodes = []
     for nid, n in act.nodes.items():
@@ -57,6 +129,9 @@ def build_graph_data(log: EventLog, findings: Optional[dict] = None,
         lab = n["label"]
         r = roles.get(lab, {}) if n["type"] == "agent" else {}
         ld = leaders.get(lab, {})
+        if attributed and n["type"] == "agent":
+            comm = status.get(nid, 0)
+            r = dict(role=goal_now.get(nid))
         nodes.append(dict(
             id=nid, ty=n["type"], lab=lab, c=n["count"],
             p0=n["first_pos"], pn=n["last_pos"], t0=n["first_ts"], tn=n["last_ts"],
@@ -82,9 +157,28 @@ def build_graph_data(log: EventLog, findings: Optional[dict] = None,
             a["inf"] = False          # at least one observed event backs this edge
     links = list(agg.values())
 
-    # ---- agent-agent edges (observed authors only)
-    proj_links = [dict(s=e["src"], t=e["dst"], p0=e["pos"], t0=e.get("ts"),
-                       w=e.get("weight", 1)) for e in proj.edges]
+    # ---- agent-agent edges
+    if attributed:
+        # Named speakers: the edge is "A @-addressed B" (both directions
+        # counted together), weight = number of addresses, t0 = first one.
+        pos_of = {e.event_id: i for i, e in enumerate(log.sorted_events(prefer_time))}
+        pairs: Dict[tuple, dict] = {}
+        for e in log.events:
+            if not e.actor or e.actor.startswith("human:"):
+                continue
+            for r in e.recipients:
+                if r == e.actor:
+                    continue
+                key = tuple(sorted((e.actor, r)))
+                p = pairs.setdefault(key, dict(s="agent:" + key[0], t="agent:" + key[1],
+                                               p0=pos_of.get(e.event_id, 0), t0=e.ts, w=0))
+                p["w"] += 1
+                if e.ts is not None and (p["t0"] is None or e.ts < p["t0"]):
+                    p["t0"], p["p0"] = e.ts, pos_of.get(e.event_id, p["p0"])
+        proj_links = list(pairs.values())
+    else:
+        proj_links = [dict(s=e["src"], t=e["dst"], p0=e["pos"], t0=e.get("ts"),
+                           w=e.get("weight", 1)) for e in proj.edges]
 
     # ---- discovery-order markers (browsing only)
     ew = findings.get("early_warning", {})
@@ -97,7 +191,10 @@ def build_graph_data(log: EventLog, findings: Optional[dict] = None,
     clock_signals = [dict(sig=s, ts=v["ts"], prec=v.get("precision"))
                      for s, v in (tc.get("signals") or {}).items() if v.get("ts")]
     ms = getattr(log, "milestones", {}) or {}
-    milestones = [dict(name=k, label=_MILESTONE_LABELS.get(k, k), ts=v) for k, v in sorted(ms.items(), key=lambda x: x[1])]
+    ms_labels = dict(_MILESTONE_LABELS, **(getattr(log, "milestone_labels", {}) or {}))
+    short = getattr(log, "milestone_short", {}) or {}
+    milestones = [dict(name=k, label=ms_labels.get(k, k), short=short.get(k, k), ts=v)
+                  for k, v in sorted(ms.items(), key=lambda x: x[1])]
 
     timed = log.timed_events(include_inferred=True)
     hours_obs: Counter = Counter()
@@ -143,9 +240,30 @@ def build_graph_data(log: EventLog, findings: Optional[dict] = None,
         attr_precision=(inf.get("attribution_eval", {}).get("all", {}) or {}).get("precision"),
         date_within_24h=inf.get("dating_eval", {}).get("within_24h"),
     )
+    if attributed:
+        A = findings["attributed"]
+        sc = (A.get("changepoint") or {}).get("score") or {}
+        claim = next((c for r in (A.get("authority") or {}).values() for c in r["claimants"]
+                      if not c["assigned"]), None)
+        rc = ((A.get("diffusion") or {}).get("case_studies") or {}).get("role_mentions", {}).get("vs_control")
+        timed_ = log.timed_events()
+        days_ = (timed_[-1].ts - timed_[0].ts) / 86400 if timed_ else 0
+        headline = dict(attributed=True, first_alert_when=tc.get("first_alert_when"),
+                        cp_alerts=len((A.get("changepoint") or {}).get("alerts") or []), days=round(days_, 1),
+                        ms_source=getattr(log, "milestone_source", None),
+                        daily_flagged=((A.get("changepoint") or {}).get("daily") or {}).get("flagged"),
+                        daily_precision=((A.get("changepoint") or {}).get("daily") or {}).get("precision"),
+                        drift_statements=((A.get("actions") or {}).get("role_drift") or {}).get("statements"),
+                        cp_detected=sc.get("detected"), cp_total=sc.get("total"),
+                        cp_false=sc.get("false_alerts"),
+                        cp_rows=[(r["label"][10:50], r["detected"], r["delay_minutes"]) for r in sc.get("milestones", [])],
+                        claim=claim and dict(agent=claim["agent"], endorsers=claim["endorsers"], ts=claim["first_claim"]),
+                        role_before=rc and rc["before"]["share"], role_after=rc and rc["after"]["share"],
+                        drift_alert=((A.get("actions") or {}).get("role_drift") or {}).get("alert"))
+    forensics = _forensics(log, findings) if attributed else None
     s = findings.get("summary", {})
     return dict(
-        meta=dict(source=log.name, axis=act.axis, n_events=len(log),
+        meta=dict(source=log.name, axis=act.axis, n_events=len(log), attributed=attributed,
                   n_agents=len(log.actors()), maxpos=maxpos, prefer_time=prefer_time,
                   named_total_frac=s.get("named_total_frac"), dated_total_frac=s.get("dated_total_frac")),
         clock=dict(tmin=tmin, tmax=tmax, window=win, n_timed=len(timed)),
@@ -156,6 +274,7 @@ def build_graph_data(log: EventLog, findings: Optional[dict] = None,
         headline=headline,
         covert=findings.get("covert", {}).get("inventory", []),
         summary=s,
+        forensics=forensics,
     )
 
 

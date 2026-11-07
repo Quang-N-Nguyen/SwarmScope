@@ -8,7 +8,11 @@ When names and times are missing (as in the redacted Swarm Traces data), SwarmSc
 
 - Plan, design, results, and all sources: [`PROJECT_PLAN.md`](PROJECT_PLAN.md)
 - Findings on Swarm Traces: [`outputs/swarm_traces/report.md`](outputs/swarm_traces/report.md)
-- Interactive viewer: open `outputs/swarm_traces/swarmscope_swarm_traces.html` in a browser. It works offline.
+- Findings on AI Village `swarm-village`: [`outputs/ai_village_swarm-village/report.md`](outputs/ai_village_swarm-village/report.md)
+- The other AI Village villages (control logs): `outputs/ai_village_<village>/report.md`, compared in [`outputs/ai_village_comparison.md`](outputs/ai_village_comparison.md)
+- Interactive viewers: open `outputs/*/swarmscope_*.html` in a browser. They work offline.
+
+When most events already name their author (AI Village), SwarmScope skips inference and adds detectors for the conversation network by phase, information diffusion, online change points, authority mismatch (an agent claiming a role it was not given), role drift (agents' own goals vs their assigned roles) and rule breaks in their shell commands. On `swarm-village` it catches an unassigned agent claiming the "god" role (73 agents followed it), and, from the agents' memories, an operator error that silently reassigned every role (alert 12 minutes after it; the chat never mentioned it). See `PROJECT_PLAN.md` §10. In the viewer, the **Forensics charts** button shows these results on one clock: change-detector scores, role talk around the reshuffle, the agents' own goals drifting after it, who the swarm treated as god, and how files, commits and coined terms spread.
 
 ## Quick start
 
@@ -44,11 +48,12 @@ swarmscope/
   loaders/             swarm_traces, ai_village, generic
   infer/               links (evidence graph), attribution, dating, aliases
   detectors/           coordination, info_spread, covert, early_warning, research
+                       + for named-speaker logs: conversation, diffusion, changepoint, authority, actions
   viz/                 template.html + inlined D3 -> one self-contained HTML file
   report.py, cli.py
 scripts/download_ai_village.py, scripts/sweep_inference.py
 tests/                 planted-collusion and tie-test checks, loader smoke tests
-outputs/swarm_traces/  report.md, findings.json, viewer HTML
+outputs/swarm_traces/, outputs/ai_village_swarm-village/   report.md, findings.json, viewer HTML
 ```
 
 ## Notes on the data

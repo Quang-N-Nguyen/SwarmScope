@@ -50,7 +50,7 @@ class TemporalGraph:
 
 
 # Resource kinds we draw as nodes in the activity graph (others stay as flags).
-_CHANNEL_REF_TYPES = ("destination", "credential", "repo", "webhook")
+_CHANNEL_REF_TYPES = ("destination", "credential", "repo", "webhook", "link", "file", "commit")
 
 
 def build_activity_graph(log: EventLog, prefer_time: bool = True,

@@ -51,6 +51,8 @@ def _parse_ts(val) -> Optional[float]:
         v = float(val)
         return v / 1000.0 if v > 1e12 else v
     s = str(val).replace("Z", "+00:00")
+    # Python 3.10 reads only 3 or 6 decimal places: pad the fraction to 6.
+    s = re.sub(r"\.(\d{1,6})\d*", lambda m: "." + m.group(1).ljust(6, "0"), s, count=1)
     try:
         import datetime as _dt
         return _dt.datetime.fromisoformat(s).timestamp()
@@ -106,6 +108,6 @@ def load(path: str, field_map: Dict[str, str], name: str = "generic",
                 text_len=len(text),
                 parent_id=_dig(row, field_map.get("parent_id")),
                 tags=[],
-                meta={},
+                meta={"text_lc": extract.mask_text_secrets(text).lower()},
             ))
     return EventLog(events, name=name)

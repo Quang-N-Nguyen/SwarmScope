@@ -221,6 +221,57 @@ def template_hash(text: str, prefix: int = 200) -> str:
 
 
 # --------------------------------------------------------------------------
+# Plain-text logs (AI Village, generic): links, files, commits
+# --------------------------------------------------------------------------
+_URL = re.compile(r"https?://([^\s\"'<>)\]]+)")
+_SECRETISH = re.compile(r"^(?=.*\d)(?=.*[A-Za-z])[A-Za-z0-9_\-]{10,}$")
+_FILE = re.compile(r"(?<![\w/.-])((?:[\w-]+/)*[\w-]+\.(?:py|json|md|js|ts|tsx|yaml|yml|toml|txt|csv|sh|html|sql|go|rs))(?![\w])")
+_COMMIT = re.compile(r"(?<![\w])([0-9a-f]{7,12})(?![\w])")
+
+
+def safe_link(url_body: str) -> str:
+    """Host + path of a URL, with secret-looking parts masked.
+
+    Logs can contain live secrets inside URLs (webhook tokens, signed links).
+    SwarmScope reports resource ids, so a URL path segment that looks like a
+    token (10+ characters mixing letters and digits) becomes ``<secret>``, and
+    the query string is dropped.
+
+    Example::
+
+        >>> safe_link("hooks.example.com/services/T03ABC123XYZ456/abcDEF123456ghiJKL?x=1")
+        'hooks.example.com/services/<secret>/<secret>'
+    """
+    u = url_body.split("?")[0].split("#")[0].rstrip("/.,;:")
+    parts = u.split("/")
+    return "/".join([parts[0]] + ["<secret>" if _SECRETISH.match(p) else p for p in parts[1:]])
+
+
+def extract_links(text: str) -> List[str]:
+    return _uniq(safe_link(m.group(1)) for m in _URL.finditer(text or ""))
+
+
+def mask_text_secrets(text: str) -> str:
+    """Replace secret-looking URL parts inside free text (for any text we show)."""
+    return _URL.sub(lambda m: "https://" + safe_link(m.group(1)), text or "")
+
+
+def extract_files(text: str) -> List[str]:
+    """File paths named in text, e.g. ``ROLES.md`` or ``content/starting_assets.json``."""
+    return _uniq(m.group(1) for m in _FILE.finditer(_URL.sub(" ", text or "")))
+
+
+def extract_commits(text: str) -> List[str]:
+    """Short git commit hashes (7-12 hex characters with both a digit and a letter)."""
+    out = []
+    for m in _COMMIT.finditer(text or ""):
+        h = m.group(1)
+        if re.search(r"\d", h) and re.search(r"[a-f]", h):
+            out.append(h)
+    return _uniq(out)
+
+
+# --------------------------------------------------------------------------
 # Time hints
 # --------------------------------------------------------------------------
 _EPOCH = re.compile(r"(?<!\d)(1[78]\d{8})(?:\d{3})?(?!\d)")        # unix seconds (opt. ms)

@@ -45,17 +45,18 @@ def main():
     except ImportError:
         sys.exit("Please `pip install huggingface_hub` first.")
 
-    # main-village files sit at the repo root; the other villages in folders.
-    prefix = "" if args.village == "main-village" else f"{args.village}/"
+    # Every village (main-village included, as of Nov 2026) is a folder.
+    prefix = f"{args.village}/"
     patterns = [f"{prefix}{t}.jsonl.gz" for t in args.tables.split(",") if t]
     patterns += [f"{prefix}README.md", f"{prefix}manifest.json", "SCHEMA.md", "CHANGELOG.md"]
+    # Note: if Python cannot reach huggingface.co, download the same files in a
+    # signed-in browser and place them in data/ai-village/<village>/.
     if args.transcript:
         patterns.append(f"{prefix}village-transcript.json")
 
-    # Files keep their repo paths under local_dir. Non-main villages already sit
-    # in a "<village>/" folder, so we download into args.out; main-village files
-    # sit at the repo root, so we give them their own folder.
-    local_dir = os.path.join(args.out, "main-village") if args.village == "main-village" else args.out
+    # Files keep their repo paths under local_dir, so they land in
+    # <out>/<village>/.
+    local_dir = args.out
     final_dir = os.path.join(args.out, args.village)
     os.makedirs(local_dir, exist_ok=True)
     print(f"Downloading {len(patterns)} patterns from {REPO} into {final_dir} ...")
