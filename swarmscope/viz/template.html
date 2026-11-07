@@ -1,0 +1,515 @@
+<title>__TITLE__</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+  /* Layout: a lab instrument -- controls rail on the left, the scope (graph) in
+     the middle, a time base (timeline) underneath. Cool neutrals biased toward
+     the teal trace colour; amber marks signals, red marks the alert. */
+  :root{
+    --bg:#eef2f1; --panel:#fbfcfc; --panel2:#e4eae9; --line:#cfd8d6;
+    --ink:#132321; --muted:#566664; --accent:#0e8a81; --on-accent:#ffffff; --accent2:#c98a06;
+    --agent:#14a89d; --dest:#e3a414; --cred:#e0524f; --repo:#8f63e0;
+    --webhook:#d65aa8; --mailbox:#e8862a; --resource:#7c8b89; --alert:#d43c3c;
+    --edge-use:rgba(86,102,100,.30); --edge-deliver:rgba(201,138,6,.40); --tie:14,138,129;
+    --f-display:"IBM Plex Sans Condensed","Arial Narrow",system-ui,sans-serif;
+    --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+    --f-data:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){
+      --bg:#0c1213; --panel:#131b1c; --panel2:#1b2526; --line:#2a3637;
+      --ink:#e3ecea; --muted:#8fa09e; --accent:#49d0c5; --on-accent:#062420; --accent2:#f0b429;
+      --agent:#49d0c5; --dest:#f0b429; --cred:#ff6b6b; --repo:#b084f5;
+      --webhook:#ff8bd0; --mailbox:#ff9f43; --resource:#6b7a8d; --alert:#ff5a5a;
+      --edge-use:rgba(143,160,158,.28); --edge-deliver:rgba(240,180,41,.35); --tie:73,208,197;
+      color-scheme:dark;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0c1213; --panel:#131b1c; --panel2:#1b2526; --line:#2a3637;
+    --ink:#e3ecea; --muted:#8fa09e; --accent:#49d0c5; --on-accent:#062420; --accent2:#f0b429;
+    --agent:#49d0c5; --dest:#f0b429; --cred:#ff6b6b; --repo:#b084f5;
+    --webhook:#ff8bd0; --mailbox:#ff9f43; --resource:#6b7a8d; --alert:#ff5a5a;
+    --edge-use:rgba(143,160,158,.28); --edge-deliver:rgba(240,180,41,.35); --tie:73,208,197;
+    color-scheme:dark;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 var(--f-body);overflow:hidden}
+  #app{display:grid;grid-template-columns:320px minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) auto;height:100%}
+  header{grid-column:1/3;display:flex;align-items:baseline;flex-wrap:wrap;gap:6px 18px;padding:10px 16px;border-bottom:1px solid var(--line);background:var(--panel)}
+  header h1{font:600 17px/1.2 var(--f-display);margin:0;letter-spacing:.3px}
+  header .stat{color:var(--muted);font-size:12px}
+  header .stat b{color:var(--ink);font-family:var(--f-data);font-weight:500;font-variant-numeric:tabular-nums}
+  aside{grid-row:2/4;background:var(--panel);border-right:1px solid var(--line);overflow-y:auto;padding:16px}
+  main{position:relative;overflow:hidden;min-width:0}
+  canvas{display:block;width:100%;height:100%}
+  footer{grid-column:2/3;background:var(--panel);border-top:1px solid var(--line);padding:10px 16px;min-width:0}
+  .sec{margin-bottom:20px}
+  .sec h2{font:600 11.5px/1.3 var(--f-display);text-transform:uppercase;letter-spacing:1.1px;color:var(--muted);margin:0 0 8px}
+  .btn{background:var(--panel2);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:6px 10px;cursor:pointer;font:500 13px var(--f-body)}
+  .btn:hover{border-color:var(--accent)}
+  .btn.on{background:var(--accent);color:var(--on-accent);border-color:var(--accent);font-weight:600}
+  :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  input{accent-color:var(--accent)}
+  .row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+  label.chk{display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;padding:2px 0}
+  select,input[type=range]{width:100%}
+  select{background:var(--panel2);color:var(--ink);border:1px solid var(--line);border-radius:7px;padding:6px}
+  .legend-item{display:flex;align-items:center;gap:8px;font-size:12.5px;margin:3px 0;color:var(--muted)}
+  .dot{width:11px;height:11px;border-radius:50%}
+  .sq{width:11px;height:11px;border-radius:2px}
+  #detail{font-size:13px}
+  #detail .k{color:var(--muted)}
+  #detail .big{font-size:15px;font-weight:650;margin-bottom:4px;word-break:break-all}
+  .pill{display:inline-block;background:var(--panel2);border:1px solid var(--line);border-radius:999px;padding:1px 8px;font-size:11px;margin:2px 3px 0 0}
+  .tl-wrap{position:relative;height:54px;margin-top:4px}
+  #timeline{position:relative;height:30px;background:var(--panel2);border:1px solid var(--line);border-radius:7px;overflow:hidden}
+  .marker{position:absolute;top:0;bottom:0;width:2px;background:var(--accent2);cursor:pointer;opacity:.9}
+  .marker.alert{background:var(--alert);width:3px}
+  #dens{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+  #chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+  .chip{font-size:11px;padding:2px 8px;border-radius:999px;border:1px solid var(--line);background:var(--panel2);cursor:pointer;color:var(--ink)}
+  .chip:hover{border-color:var(--accent)}
+  .chip .sw{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px;vertical-align:middle}
+  .kpi{font:600 24px/1.1 var(--f-display);font-variant-numeric:tabular-nums}
+  .kpi-l{font-size:11.5px;color:var(--muted);margin-bottom:8px}
+  #progress{position:absolute;top:0;bottom:0;left:0;background:rgba(var(--tie),.14);border-right:2px solid var(--accent);pointer-events:none}
+  .ctrls{display:flex;align-items:center;gap:10px;margin-top:8px}
+  .ctrls .play{width:40px;height:40px;border-radius:50%;font-size:16px;display:flex;align-items:center;justify-content:center}
+  .tiny{font:11.5px var(--f-data);color:var(--muted);font-variant-numeric:tabular-nums}
+  .hint{font-size:11.5px;color:var(--muted);margin-top:6px;line-height:1.4}
+  #tooltip{position:absolute;pointer-events:none;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 9px;font-size:12px;max-width:240px;opacity:0;transition:opacity .1s;box-shadow:0 4px 18px rgba(var(--tie),.18);z-index:5}
+  a.link{color:var(--accent);text-decoration:none}
+  @media (max-width:760px){
+    body{overflow:auto}
+    #app{grid-template-columns:1fr;grid-template-rows:auto 60vh auto auto;height:auto}
+    header{grid-column:1;flex-wrap:wrap;gap:8px}
+    header .stat[style]{margin-left:0!important}
+    main{grid-row:2;min-height:60vh}
+    footer{grid-column:1;grid-row:3}
+    aside{grid-row:4;border-right:none;border-top:1px solid var(--line)}
+    .ctrls{flex-wrap:wrap}
+    #t-read{min-width:0!important}
+  }
+</style>
+<div id="app">
+  <header>
+    <h1>SwarmScope</h1>
+    <span class="stat">source <b id="s-src">—</b></span>
+    <span class="stat">events <b id="s-ev">—</b></span>
+    <span class="stat">named agents <b id="s-ag">—</b></span>
+    <span class="stat">axis <b id="s-axis">—</b></span>
+    <span class="stat" style="margin-left:auto"><b id="s-vis">—</b> visible</span>
+  </header>
+
+  <aside>
+    <div class="sec" id="headline" hidden>
+      <h2>Early warning (real clock)</h2>
+      <div class="kpi" id="kpi-lead">—</div>
+      <div class="kpi-l" id="kpi-lead-l"></div>
+      <div class="kpi" id="kpi-alert" style="font-size:15px">—</div>
+      <div class="kpi-l" id="kpi-alert-l"></div>
+    </div>
+
+    <div class="sec">
+      <h2>View</h2>
+      <div class="row">
+        <button class="btn on" id="mode-activity">Activity</button>
+        <button class="btn" id="mode-coord">Coordination</button>
+      </div>
+      <div class="hint" id="mode-hint"></div>
+    </div>
+
+    <div class="sec">
+      <h2>Reveal over time</h2>
+      <div class="row">
+        <button class="btn on" id="t-cumulative">Cumulative</button>
+        <button class="btn" id="t-window">Sliding window</button>
+      </div>
+      <div class="hint">Cumulative shows everything up to the cursor. Sliding window shows only recent activity, so you can watch bursts pass through.</div>
+    </div>
+
+    <div class="sec" id="filters">
+      <h2>Edge types</h2>
+      <label class="chk"><input type="checkbox" id="k-use" checked data-kind="use"> use — agent touched a resource</label>
+      <label class="chk"><input type="checkbox" id="k-deliver" checked data-kind="deliver"> deliver — resource routed to an agent</label>
+      <label class="chk"><input type="checkbox" id="k-coord" checked data-kind="coordinate"> coordinate — agents shared a resource</label>
+    </div>
+
+    <div class="sec" id="tie-sec" hidden>
+      <h2>Minimum tie strength</h2>
+      <input type="range" id="tie" min="0" max="100" value="0">
+      <div class="tiny" id="tie-read"></div>
+      <div class="hint">Tie strength is the Adamic–Adar score: a resource everyone uses adds little, a resource only two agents share adds a lot. Raise it to hide ties made only through common infrastructure and keep the telling ones.</div>
+    </div>
+
+    <div class="sec">
+      <h2>Highlight mechanism</h2>
+      <select id="mech"><option value="">— none —</option></select>
+      <div class="hint">Agents that used the chosen covert mechanism glow; the rest dim.</div>
+    </div>
+
+    <div class="sec">
+      <h2>Legend</h2>
+      <div id="legend"></div>
+    </div>
+
+    <div class="sec">
+      <h2>Selected node</h2>
+      <div id="detail"><span class="tiny">Click a node to inspect it.</span></div>
+    </div>
+  </aside>
+
+  <main>
+    <canvas id="cv"></canvas>
+    <div id="tooltip"></div>
+  </main>
+
+  <footer>
+    <div class="tl-wrap" style="height:auto">
+      <div id="timeline"><canvas id="dens"></canvas><div id="progress"></div></div>
+      <div id="chips"></div>
+    </div>
+    <div class="ctrls">
+      <button class="btn play" id="play">▶</button>
+      <input type="range" id="scrub" min="0" max="1000" value="0">
+      <span class="tiny" id="t-read" style="min-width:150px;text-align:right"></span>
+      <select id="speed" style="width:auto">
+        <option value="1">1×</option><option value="2" selected>2×</option><option value="4">4×</option><option value="8">8×</option>
+      </select>
+    </div>
+    <div class="hint" id="axis-note"></div>
+  </footer>
+</div>
+
+<script>/*__D3__*/</script>
+<script>
+const DATA = /*__DATA__*/;
+(function(){
+"use strict";
+const META = DATA.meta, MAX = META.maxpos || 1;
+// Colours come from the CSS tokens, so the canvas follows the light/dark theme.
+let TYPE_COLORS = {}, TIE_RGB = '14,138,129', EDGE_USE = 'rgba(86,102,100,.3)', EDGE_DELIVER = 'rgba(201,138,6,.4)';
+function readTheme(){
+  TYPE_COLORS = {agent:getVar('--agent'),dest:getVar('--dest'),destination:getVar('--dest'),
+    credential:getVar('--cred'),repo:getVar('--repo'),webhook:getVar('--webhook'),
+    mailbox:getVar('--mailbox'),resource:getVar('--resource')};
+  TIE_RGB = getVar('--tie'); EDGE_USE = getVar('--edge-use'); EDGE_DELIVER = getVar('--edge-deliver');
+}
+const COMM_COLORS = d3.schemeTableau10.concat(d3.schemeSet3);
+function getVar(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim()||'#888';}
+readTheme();
+const REDUCED = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// ---- header
+document.getElementById('s-src').textContent = META.source;
+document.getElementById('s-ev').textContent = META.n_events.toLocaleString();
+document.getElementById('s-ag').textContent = META.n_agents.toLocaleString();
+document.getElementById('s-axis').textContent = META.axis;
+document.getElementById('axis-note').textContent = ({
+  time: 'Axis = real timestamps from the log.',
+  estimated: 'Axis = estimated order: events sorted by when the resources they reference first appeared. Most records carry no timestamp, so this is a rough proxy for time, not a clock. Orange bars = share of events in that slice that are board / mailbox writes.',
+  sequence: 'Axis = raw log order (no timestamps available).'
+})[META.axis] || '';
+
+// ---- build node/link sets for the two modes
+const nodeById = new Map();
+DATA.nodes.forEach(n=>{ n.vx=0; n.vy=0; nodeById.set(n.id, n); });
+
+// activity links reference ids that must exist as nodes; keep only valid
+const actLinks = DATA.links.filter(l=>nodeById.has(l.s)&&nodeById.has(l.t))
+  .map(l=>({source:l.s,target:l.t,k:l.k,p0:l.p0,pn:l.pn,w:l.w}));
+const projLinks = DATA.proj_links.filter(l=>nodeById.has(l.s)&&nodeById.has(l.t))
+  .map(l=>({source:l.s,target:l.t,k:'coordinate',p0:l.p0,pn:l.p0,w:l.w}));
+
+const agentNodes = DATA.nodes.filter(n=>n.ty==='agent');
+
+let mode='activity';               // 'activity' | 'coordination'
+let timeMode='cumulative';         // 'cumulative' | 'window'
+const WINDOW = Math.max(50, Math.round(MAX*0.08));
+let t = MAX;                       // start fully revealed
+let playing=false, speed=2;
+const kindOn = {use:true,deliver:true,coordinate:true};
+let mech='';
+
+// ---- legend
+(function(){
+  const el=document.getElementById('legend');
+  const items=[['agent','agent','dot'],['dest','dead-drop / dataset','sq'],['credential','credential (secret)','sq'],
+    ['repo','repository','sq'],['mailbox','mailbox','sq'],['webhook','webhook','sq']];
+  items.forEach(([ty,label,shape])=>{
+    const d=document.createElement('div'); d.className='legend-item';
+    const m=document.createElement('span'); m.className=shape; m.style.background=TYPE_COLORS[ty]||getVar('--resource');
+    d.appendChild(m); d.appendChild(document.createTextNode(label)); el.appendChild(d);
+  });
+})();
+
+// ---- mechanism dropdown from covert inventory
+(function(){
+  const sel=document.getElementById('mech');
+  (DATA.covert||[]).forEach(r=>{
+    const o=document.createElement('option'); o.value=r.mechanism;
+    o.textContent=`${r.mechanism} (${r.n_events.toLocaleString()})`; sel.appendChild(o);
+  });
+  sel.addEventListener('change',e=>{mech=e.target.value; draw();});
+})();
+
+// ---- canvas + simulation
+const canvas=document.getElementById('cv'), ctx=canvas.getContext('2d');
+let W=0,H=0,DPR=Math.min(2,window.devicePixelRatio||1);
+function resize(){
+  const r=canvas.parentElement.getBoundingClientRect();
+  W=r.width;H=r.height;
+  canvas.width=W*DPR;canvas.height=H*DPR;ctx.setTransform(DPR,0,0,DPR,0,0);
+  if(sim){sim.force('center',d3.forceCenter(W/2,H/2)); sim.alpha(0.3).restart();}
+  draw();
+}
+window.addEventListener('resize',resize);
+
+let transform=d3.zoomIdentity;
+d3.select(canvas).call(d3.zoom().scaleExtent([0.2,6]).on('zoom',ev=>{transform=ev.transform;draw();}));
+
+// Log-scaled and capped, so a resource with 14,000 events does not swallow the view.
+function sizeOf(n){
+  if(mode==='coordination' && n.ty!=='agent') return 0;
+  const base = n.ty==='agent' ? 3 : 4;
+  return Math.min(n.ty==='agent'?11:16, base + 1.6*Math.log2(1+n.c));
+}
+
+let sim;
+function activeNodes(){ return mode==='coordination' ? agentNodes : DATA.nodes; }
+function activeLinks(){ return mode==='coordination' ? projLinks : actLinks; }
+
+function startSim(){
+  const nodes=activeNodes(), links=activeLinks();
+  sim=d3.forceSimulation(nodes)
+    .force('charge',d3.forceManyBody().strength(mode==='coordination'?-60:-45).distanceMax(380))
+    .force('link',d3.forceLink(links).id(d=>d.id).distance(l=>l.k==='coordinate'?70:46).strength(l=>Math.min(.7,0.08+0.02*(l.w||1))))
+    .force('center',d3.forceCenter(W/2,H/2))
+    .force('collide',d3.forceCollide().radius(n=>sizeOf(n)+2))
+    .force('x',d3.forceX(W/2).strength(0.03)).force('y',d3.forceY(H/2).strength(0.03));
+  if(REDUCED){
+    // No animated settling: compute the layout up front, then draw once.
+    sim.stop(); for(let i=0;i<300;i++) sim.tick(); draw();
+  } else {
+    sim.on('tick',draw); sim.alpha(0.9).restart();
+  }
+}
+
+// ---- visibility by time
+function nodeVisible(n){
+  if(mode==='coordination' && n.ty!=='agent') return false;
+  if(timeMode==='cumulative') return n.p0<=t;
+  return n.pn>=t-WINDOW && n.p0<=t;     // window overlap
+}
+let tieMin = 0;
+const TIE_MAX = projLinks.reduce((m,l)=>Math.max(m,l.w||0), 0) || 1;
+function linkVisible(l){
+  if(!kindOn[l.k]) return false;
+  if(l.k==='coordinate' && (l.w||0) < tieMin) return false;
+  if(timeMode==='cumulative'){ if(l.p0>t) return false; }
+  else { if(!(l.pn>=t-WINDOW && l.p0<=t)) return false; }
+  return nodeVisible(typeof l.source==='object'?l.source:nodeById.get(l.source)) &&
+         nodeVisible(typeof l.target==='object'?l.target:nodeById.get(l.target));
+}
+
+function nodeColor(n){
+  if(mode==='coordination'){ return n.comm>=0 ? COMM_COLORS[n.comm%COMM_COLORS.length] : getVar('--resource'); }
+  return TYPE_COLORS[n.ty]||getVar('--resource');
+}
+function mechDim(n){ return mech && n.ty==='agent' && !(n.mech||[]).includes(mech); }
+function mechGlow(n){ return mech && n.ty==='agent' && (n.mech||[]).includes(mech); }
+
+function draw(){
+  ctx.save(); ctx.clearRect(0,0,W,H);
+  ctx.translate(transform.x,transform.y); ctx.scale(transform.k,transform.k);
+  const links=activeLinks(), nodes=activeNodes();
+  // edges
+  ctx.lineWidth=0.7/transform.k; let visE=0, visN=0;
+  for(const l of links){
+    if(!linkVisible(l)) continue; visE++;
+    const s=l.source,tg=l.target;
+    if(l.k==='coordinate'){
+      // stronger (rarer) ties are thicker and more opaque
+      const s01 = Math.min(1,(l.w||0)/TIE_MAX);
+      ctx.strokeStyle = `rgba(${TIE_RGB},${0.12+0.6*s01})`;
+      ctx.lineWidth = (0.5+2.5*s01)/transform.k;
+    } else {
+      ctx.strokeStyle = l.k==='deliver' ? EDGE_DELIVER : EDGE_USE;
+      ctx.lineWidth = 0.7/transform.k;
+    }
+    ctx.globalAlpha = mech ? 0.25 : 1;
+    ctx.beginPath(); ctx.moveTo(s.x,s.y); ctx.lineTo(tg.x,tg.y); ctx.stroke();
+  }
+  ctx.globalAlpha=1;
+  // nodes
+  for(const n of nodes){
+    if(!nodeVisible(n)) continue; visN++;
+    const r=sizeOf(n); if(r<=0) continue;
+    ctx.beginPath();
+    if(n.ty==='agent'){ ctx.arc(n.x,n.y,r,0,6.283); }
+    else { ctx.rect(n.x-r,n.y-r,2*r,2*r); }
+    ctx.fillStyle=nodeColor(n);
+    ctx.globalAlpha = mechDim(n)?0.12:1;
+    ctx.fill();
+    if(mechGlow(n)){ ctx.lineWidth=2/transform.k; ctx.strokeStyle=getVar('--ink'); ctx.stroke(); }
+    if(n===selected){ ctx.lineWidth=2.5/transform.k; ctx.strokeStyle=getVar('--accent'); ctx.stroke(); }
+    ctx.globalAlpha=1;
+  }
+  ctx.restore();
+  document.getElementById('s-vis').textContent=`${visN} nodes · ${visE} edges`;
+}
+
+// ---- picking (screen -> graph)
+function pick(mx,my){
+  const x=(mx-transform.x)/transform.k, y=(my-transform.y)/transform.k;
+  let best=null,bd=1e9;
+  for(const n of activeNodes()){
+    if(!nodeVisible(n)) continue;
+    const r=sizeOf(n)+3, dx=n.x-x, dy=n.y-y, d=dx*dx+dy*dy;
+    if(d<r*r && d<bd){bd=d;best=n;}
+  }
+  return best;
+}
+let selected=null;
+const tip=document.getElementById('tooltip');
+canvas.addEventListener('mousemove',e=>{
+  const rect=canvas.getBoundingClientRect(), n=pick(e.clientX-rect.left,e.clientY-rect.top);
+  if(n){ tip.style.opacity=1; tip.style.left=(e.clientX-rect.left+12)+'px'; tip.style.top=(e.clientY-rect.top+12)+'px';
+    tip.innerHTML=`<b>${esc(n.lab)}</b><br><span class="tiny">${n.ty} · ${n.c.toLocaleString()} events</span>`;
+    canvas.style.cursor='pointer';
+  } else { tip.style.opacity=0; canvas.style.cursor='default'; }
+});
+canvas.addEventListener('mouseleave',()=>tip.style.opacity=0);
+canvas.addEventListener('click',e=>{
+  const rect=canvas.getBoundingClientRect(), n=pick(e.clientX-rect.left,e.clientY-rect.top);
+  selected=n; renderDetail(n); draw();
+});
+function renderDetail(n){
+  const el=document.getElementById('detail');
+  if(!n){el.innerHTML='<span class="tiny">Click a node to inspect it.</span>';return;}
+  let h=`<div class="big">${esc(n.lab)}</div>`;
+  h+=`<div><span class="k">type</span> ${n.ty}</div>`;
+  h+=`<div><span class="k">events</span> ${n.c.toLocaleString()}</div>`;
+  h+=`<div><span class="k">first→last pos</span> ${n.p0} → ${n.pn}</div>`;
+  if(n.comm>=0) h+=`<div><span class="k">community</span> ${n.comm}</div>`;
+  if((n.mech||[]).length) h+=`<div style="margin-top:6px"><span class="k">mechanisms</span><br>${n.mech.map(m=>`<span class="pill">${esc(m)}</span>`).join('')}</div>`;
+  el.innerHTML=h;
+}
+function esc(s){return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+
+// ---- timeline: density strip, signal markers, and clickable chips
+function shortSig(s){return ({shared_deaddrop:'shared resource',shared_deaddrop_nontask:'shared non-task resource',
+  private_channel:'private channel',credential_reuse:'credential reuse',board:'board / mailbox',
+  duplicate_control:'duplicate control',signed_cmd:'signed command'})[s]||s;}
+function drawDensity(){
+  const c=document.getElementById('dens'); if(!DATA.density) return;
+  const r=c.getBoundingClientRect(); const d=Math.min(2,window.devicePixelRatio||1);
+  c.width=r.width*d; c.height=r.height*d; const g=c.getContext('2d'); g.setTransform(d,0,0,d,0,0);
+  const draw1=(arr,color,scaleTo)=>{
+    const mx=Math.max(1,...arr), bw=r.width/arr.length;
+    g.fillStyle=color;
+    arr.forEach((v,i)=>{ const h=(Math.sqrt(v)/Math.sqrt(mx))*r.height*scaleTo; g.fillRect(i*bw,r.height-h,Math.max(1,bw-0.5),h); });
+  };
+  g.clearRect(0,0,r.width,r.height);
+  // Bins hold equal numbers of events, so only the *share* of board / mailbox
+  // writes per bin carries information. Draw that.
+  const share = DATA.density.coord.map((v,i)=> v/Math.max(1,DATA.density.all[i]));
+  draw1(share,getVar('--mailbox'),0.95);
+}
+(function(){
+  const tl=document.getElementById('timeline'), chips=document.getElementById('chips');
+  const ms=(DATA.markers||[]).slice().sort((a,b)=>a.pos-b.pos);
+  ms.forEach(m=>{
+    const d=document.createElement('div'); d.className='marker'; d.style.left=(m.frac*100)+'%';
+    d.title=`${shortSig(m.sig)}: first fires at ${(m.frac*100).toFixed(2)}% of the stream`;
+    d.addEventListener('click',()=>setT(m.pos)); tl.appendChild(d);
+    const ch=document.createElement('span'); ch.className='chip';
+    ch.innerHTML=`<span class="sw" style="background:var(--accent2)"></span>${shortSig(m.sig)} · ${(m.frac*100).toFixed(2)}%`;
+    ch.title='Jump to the first time this signal fires';
+    ch.addEventListener('click',()=>setT(m.pos)); chips.appendChild(ch);
+  });
+  if(DATA.alert){
+    const a=document.createElement('div'); a.className='marker alert'; a.style.left=(DATA.alert.frac*100)+'%';
+    a.title=`Combined multi-agent alert at ${(DATA.alert.frac*100).toFixed(2)}%`;
+    a.addEventListener('click',()=>setT(DATA.alert.pos)); tl.appendChild(a);
+    const ch=document.createElement('span'); ch.className='chip';
+    ch.innerHTML=`<span class="sw" style="background:var(--alert)"></span><b>first alert</b> · ${(DATA.alert.frac*100).toFixed(2)}%`;
+    ch.addEventListener('click',()=>setT(DATA.alert.pos)); chips.appendChild(ch);
+  }
+})();
+
+// ---- headline (real-clock early warning)
+(function(){
+  const h=DATA.headline||{}; if(!h.first_alert_when) return;
+  document.getElementById('headline').hidden=false;
+  const lp=h.lead_private||{}, lb=h.lead_board||{};
+  if(lp.hf_worker_rce!=null){
+    document.getElementById('kpi-lead').textContent=`${lp.hf_worker_rce} h`;
+    document.getElementById('kpi-lead-l').textContent=
+      `warning before the Hugging Face worker RCE, from the structure-only "private channel" signal (${lp.hf_credentials_found} h before credentials were found).`;
+  }
+  document.getElementById('kpi-alert').textContent=h.first_alert_when;
+  document.getElementById('kpi-alert-l').textContent=
+    `first multi-agent alert, replaying only the ${(h.n_timed||0).toLocaleString()} dated events. `+
+    (lb.public_discovery!=null?`That is ~${Math.round(lb.public_discovery/24)} days before public discovery.`:'');
+})();
+
+// ---- controls
+const scrub=document.getElementById('scrub'), tread=document.getElementById('t-read'), prog=document.getElementById('progress');
+function setT(v){ t=Math.max(0,Math.min(MAX,v)); scrub.value=Math.round(t/MAX*1000);
+  const f=(t/MAX*100).toFixed(1);
+  tread.textContent = META.axis==='time' ? `pos ${Math.round(t)} · ${f}%` : `pos ${Math.round(t)} / ${MAX} · ${f}%`;
+  prog.style.width=f+'%'; draw();
+}
+scrub.addEventListener('input',()=>setT(scrub.value/1000*MAX));
+document.getElementById('speed').addEventListener('change',e=>speed=+e.target.value);
+const playBtn=document.getElementById('play');
+playBtn.addEventListener('click',()=>{ playing=!playing; playBtn.textContent=playing?'❚❚':'▶';
+  if(playing && t>=MAX) setT(0); if(playing) requestAnimationFrame(loop); });
+let last=0;
+function loop(ts){
+  if(!playing) return;
+  if(!last) last=ts; const dt=ts-last; last=ts;
+  setT(t + MAX*(dt/8000)*speed);
+  if(t>=MAX){ playing=false; playBtn.textContent='▶'; last=0; return; }
+  requestAnimationFrame(loop);
+}
+
+function setMode(m){
+  mode=m;
+  document.getElementById('mode-activity').classList.toggle('on',m==='activity');
+  document.getElementById('mode-coord').classList.toggle('on',m==='coordination');
+  document.getElementById('mode-hint').textContent = m==='activity'
+    ? 'Agents (circles) and the dead-drops / datasets / credentials they touch (squares). Edge = an agent used that resource.'
+    : 'Agent-to-agent only. Two agents are linked when they shared a resource; thicker = rarer shared resource. Colour = community.';
+  document.getElementById('tie-sec').hidden = m!=='coordination';
+  startSim(); draw();
+}
+document.getElementById('mode-activity').addEventListener('click',()=>setMode('activity'));
+document.getElementById('mode-coord').addEventListener('click',()=>setMode('coordination'));
+document.getElementById('t-cumulative').addEventListener('click',()=>{timeMode='cumulative';
+  document.getElementById('t-cumulative').classList.add('on');document.getElementById('t-window').classList.remove('on');draw();});
+document.getElementById('t-window').addEventListener('click',()=>{timeMode='window';
+  document.getElementById('t-window').classList.add('on');document.getElementById('t-cumulative').classList.remove('on');draw();});
+document.querySelectorAll('#filters input').forEach(c=>c.addEventListener('change',e=>{kindOn[e.target.dataset.kind]=e.target.checked;draw();}));
+
+// ---- tie-strength slider
+(function(){
+  const s=document.getElementById('tie'), r=document.getElementById('tie-read');
+  const upd=()=>{ tieMin = (s.value/100)*TIE_MAX;
+    const kept = projLinks.filter(l=>(l.w||0)>=tieMin).length;
+    r.textContent = `≥ ${tieMin.toFixed(2)} · ${kept.toLocaleString()} of ${projLinks.length.toLocaleString()} ties`; draw(); };
+  s.addEventListener('input',upd); upd();
+})();
+
+// ---- go
+resize(); startSim(); setMode('activity'); setT(MAX); drawDensity();
+// Re-read colours when the theme changes (OS setting or the viewer's toggle).
+if(window.matchMedia) window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{readTheme();draw();drawDensity();});
+new MutationObserver(()=>{readTheme();draw();drawDensity();}).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+window.addEventListener('resize',drawDensity);
+setTimeout(()=>{ if(sim) sim.alpha(0.2).restart(); }, 400);
+})();
+</script>

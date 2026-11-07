@@ -1,0 +1,5 @@
+# SwarmScope itself uses only the Python standard library (3.9+).
+# Optional: only needed to download the gated AI Village dataset.
+huggingface_hub>=0.20
+# Optional: to run the tests with pytest instead of plain python.
+pytest>=7

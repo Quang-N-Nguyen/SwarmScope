@@ -1,0 +1,10 @@
+.DS_Store
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# AI Village data is gated (research terms): never commit it
+data/
+
+# findings.json is large (~1.6 MB) and can be regenerated; keep report + viewer
+outputs/**/findings.json
