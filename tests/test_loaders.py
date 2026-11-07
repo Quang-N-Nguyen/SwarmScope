@@ -128,9 +128,12 @@ def test_actions_role_drift_and_rule_breaks():
                   os.path.join(d, "computer_use_sessions.jsonl.gz"))
         _write_gz([{"session_id": "s1", "created_at": iso(t0 + 120),
                     "agent_action": {"command": "git add mod/x.py && git commit -m x && git push"},
-                    "output": "[main abc1234] x\n 1 file changed"},
+                    "output": "[main abc1234] x\n 1 file changed\n   1111111..abc1234  main -> main"},
+                   # quiet commit, no push line: landed only because another agent later sees its hash
                    {"session_id": "s4", "created_at": iso(t0 + 130),
-                    "agent_action": {"command": "git add engine.py && git commit -m y"}, "output": "[main def5678] y"},
+                    "agent_action": {"command": "git add engine.py && git commit -q -m y"}, "output": "[main def5678] y"},
+                   {"session_id": "s1", "created_at": iso(t0 + 150),
+                    "agent_action": {"command": "git log --oneline -1"}, "output": "def5678 y"},
                    {"session_id": "s1", "created_at": iso(t0 + 140),
                     "agent_action": {"command": "./earth act join --agent a1"}, "output": "ok"}],
                   os.path.join(d, "computer_use_turns.jsonl.gz"))
@@ -141,6 +144,8 @@ def test_actions_role_drift_and_rule_breaks():
         assert abs(rd["alert"] - (t0 + 3720)) < 1 and rd["after_milestone"]["milestone"] == "op"
         rb = actions.rule_breaks(log, d, privileged={"god1"})
         assert rb["code_landed_unprivileged"] == ["a1"], rb
+        god = next(r for r in rb["code"] if r["agent"] == "god1")
+        assert god["landed"] == 1, "a commit another agent later sees has landed"
         assert rb["interface_uses"] == 1
 
 

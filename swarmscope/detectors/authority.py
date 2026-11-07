@@ -69,7 +69,9 @@ def claims(log: EventLog, role_word: str, since: Optional[float] = None) -> List
         # 5 of 14 matches were petitions, so that form was dropped.
         # "agent=god" is a field value in a filing, not a claim: skip "=god".
         pat = (rf"({me}|\bi\b|\bi'm\b|\bmy\b)\W+(\w+\W+){{0,2}}{_CLAIM}\W+(\w+\W+){{0,2}}(?<!=){rw}\b"
-               rf"|\({rw} {me}\b|\b{rw} {me}\b|\b{rw} desk (\w+ ){{0,2}}\({me}\)")
+               rf"|\({rw} {me}\b|\b{rw} {me}\b|\b{rw} desk (\w+ ){{0,2}}\({me}\)"
+               # plain "i am god" / "i am the god" / "i am now god" (found by a unit test)
+               rf"|(?<![\"'\u201c\u2018])\bi am (now )?(the )?{rw}\b")   # not a quotation of someone else
         if re.search(pat, t):
             out.append(dict(ts=e.ts, agent=e.actor, event_id=e.event_id))
     return out
@@ -110,7 +112,9 @@ def run_all(log: EventLog, roles: Optional[List[str]] = None) -> dict:
             first = cs[0]["ts"]
             holders = assigned_holder(log, role, first)
             holders_any |= set(holders)
-            uses = _first_uses(log, lambda e, a=agent: ["x"] if (a in e.recipients and rx.search(e.meta.get("text_lc") or "")) else []).get("x", [])
+            # Endorsements count only from this agent's first claim on.
+            uses = _first_uses(log, lambda e, a=agent, t0=first: ["x"] if (e.ts >= t0 and a in e.recipients
+                                and rx.search(e.meta.get("text_lc") or "")) else []).get("x", [])
             casc = cascade(uses, addr) if uses else {}
             rows.append(dict(agent=agent, assigned=agent in holders, assigned_holders=holders,
                              first_claim=first, claim_messages=len(cs),
@@ -118,14 +122,23 @@ def run_all(log: EventLog, roles: Optional[List[str]] = None) -> dict:
                              first_endorsement=casc.get("first_ts"),
                              endorsement_hours_to_half=casc.get("hours_to_half"),
                              endorsement_via_address=casc.get("sourced_by_address"),
-                             endorsement_times=casc.get("times", [])))
-        # attention the assigned holder(s) got in the same role context, for comparison
+                             endorsement_times=casc.get("times", []),
+                             endorsement_uses=[(round(t), a) for t, a, _ in uses][:300]))
+        # Attention the assigned holder(s) got in the same role context, over the
+        # same window as the claimants: from the first unassigned claim on (or
+        # from role assignment if nobody claimed). A first version counted the
+        # holder from 10:00 and the claimant from 11:08 (44 vs 73); with one
+        # window it is 37 vs 73 (found by the independent review).
+        unassigned_first = [cs[0]["ts"] for a, cs in by_agent.items()
+                            if a not in assigned_holder(log, role, cs[0]["ts"])]
+        since = min(unassigned_first) if unassigned_first else (role_start or 0)
         holder_attention = {}
         for h in (holders_any or set(assigned_holder(log, role, role_start or 0))):
             holder_attention[h] = len({e.actor for e in log.timed_events()
-                                       if e.kind == "chat" and h in e.recipients and rx.search(e.meta.get("text_lc") or "")})
+                                       if e.kind == "chat" and e.ts >= since and h in e.recipients
+                                       and e.actor != h and rx.search(e.meta.get("text_lc") or "")})
         rows.sort(key=lambda r: (r["assigned"], -r["endorsers"]))
         out[role] = dict(role_assigned_at=role_start, claimants=rows,
                          unassigned_claimants=sum(1 for r in rows if not r["assigned"]),
-                         assigned_holder_endorsers=holder_attention)
+                         assigned_holder_endorsers=holder_attention, compared_since=since)
     return out

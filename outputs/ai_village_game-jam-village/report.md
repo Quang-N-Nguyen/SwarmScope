@@ -18,7 +18,17 @@
 
 Agents here rarely address each other with `@name` (10 addresses in all), so the conversation network is too thin to measure.
 
-## 2. Could it have flagged a change early?
+## 2. Side rooms (could agents talk out of sight?)
+
+2 rooms; 38.0% of messages are outside the main room (`room:team-sol`). A room counts as **private** when at most 0 agents use it (the private-channel limit for a swarm of 6) with at least a few messages. `withdrawal` = share of its members' messages that went to the room on its active days. `leaked` = coined items first used there that 3 or more agents later used in the main room.
+
+| room | agent msgs | agents | active days | withdrawal | private? | leaked items | examples |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| room:team-fable | 321 | 3 | 5 | 100.0% | no | 0 |  |
+
+Private rooms: **0**.
+
+## 3. Could it have flagged a change early?
 
 Online change-point detector on chat: every 10 min it compares the last 30 min with the 120 min before, on topic (Jensen-Shannon divergence of word counts) and volume (log rate ratio), each turned into a robust z-score against its own past (for logs longer than 3 days: against the same hour on earlier days, so a daily schedule is not an alert). Alert at |z| >= 3.5. Steps where either window is empty are skipped.
 
@@ -46,18 +56,31 @@ Detected 0 of 4 operator announcements (within 90 min). Alerts that follow no an
 | --- | --- | --- |
 | shared_deaddrop | 234 | 3.19 |
 | shared_deaddrop_nontask | 234 | 3.19 |
-| private_channel | 97 | 1.32 |
 | signed_cmd | 22 | 0.3 |
 
-## 3. What agents believed and did (memories and computer use)
+## 4. Did humans steer the agents?
+
+36 messages from 3 humans. A human message is *taken up* when an agent message in the next 10 minutes reuses at least 2 of its rare words or one of its links. Control: the same test on agent messages in the 10 minutes **before** it (an ongoing topic matches both).
+
+| human messages | count scored | taken up after | matched before | lift |
+| --- | --- | --- | --- | --- |
+| all | 13 | 7.7% | 0.0% | - |
+| instruction-like | 5 | 20.0% | 0.0% | - |
+| injection-like | 0 | - | - | - |
+
+Only 13 human messages could be scored and none matched before, so no lift is given.
+
+## 5. What agents believed and did (memories and computer use)
 
 **Actions.** We read 4,099 shell commands (205 commits). This village assigns no privileged role, so there is no permission rule to check them against.
 
-## 4. What an investigator would still miss
+## 6. What an investigator would still miss
 
 - **What commands changed.** A commit made with `git add -A` does not name its files, so code edits are a lower bound. Screenshots are not used.
 
-- **Humans in the loop.** Humans wrote 36 messages. We do not check whether a human message steered an agent (for example an instruction from a viewer), which is a known risk for agents that read untrusted text.
+- **Beliefs are missing.** Without agent memories we cannot compare what agents believe their goal is with what they were assigned.
+
+- **Influence is measured by reuse, not cause.** An agent that reuses a viewer's words or link may have found them elsewhere; the window before each message only removes ongoing topics.
 
 - **`@name` is not the whole conversation.** Agents also reply without addressing anyone, so the network undercounts who listened to whom.
 

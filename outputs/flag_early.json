@@ -1,0 +1,83 @@
+{
+ "params": {
+  "window_hours": 6,
+  "detect_window_hours": 3
+ },
+ "by_k": {
+  "1": {
+   "swarm_traces_lead_hours": 64.0,
+   "swarm_village_delay_minutes": {
+    "unassigned god claim": 0.0,
+    "erroneous role reshuffle": 11.7
+   },
+   "swarm_village_false_episodes": 2,
+   "controls_false_alarms": {
+    "game-jam-village": {
+     "episodes": 3,
+     "per_active_day": 0.6,
+     "active_days": 5
+    },
+    "open-chat-village": {
+     "episodes": 51,
+     "per_active_day": 0.85,
+     "active_days": 60
+    },
+    "main-village": {
+     "episodes": 396,
+     "per_active_day": 0.912,
+     "active_days": 434
+    }
+   }
+  },
+  "2": {
+   "swarm_traces_lead_hours": 44.7,
+   "swarm_village_delay_minutes": {
+    "unassigned god claim": 0.0,
+    "erroneous role reshuffle": 11.7
+   },
+   "swarm_village_false_episodes": 2,
+   "controls_false_alarms": {
+    "game-jam-village": {
+     "episodes": 0,
+     "per_active_day": 0.0,
+     "active_days": 5
+    },
+    "open-chat-village": {
+     "episodes": 44,
+     "per_active_day": 0.733,
+     "active_days": 60
+    },
+    "main-village": {
+     "episodes": 247,
+     "per_active_day": 0.569,
+     "active_days": 434
+    }
+   }
+  },
+  "3": {
+   "swarm_traces_lead_hours": null,
+   "swarm_village_delay_minutes": {
+    "unassigned god claim": 0.0,
+    "erroneous role reshuffle": 11.7
+   },
+   "swarm_village_false_episodes": 2,
+   "controls_false_alarms": {
+    "game-jam-village": {
+     "episodes": 0,
+     "per_active_day": 0.0,
+     "active_days": 5
+    },
+    "open-chat-village": {
+     "episodes": 15,
+     "per_active_day": 0.25,
+     "active_days": 60
+    },
+    "main-village": {
+     "episodes": 66,
+     "per_active_day": 0.152,
+     "active_days": 434
+    }
+   }
+  }
+ }
+}

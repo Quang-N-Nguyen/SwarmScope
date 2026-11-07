@@ -222,9 +222,13 @@ def _goal_milestones(log: EventLog, goals: List[dict]) -> None:
     log.milestone_source = "village goal changes"
 
 
-ROLE_CHANGE = (r"\b(new role|my (new )?role|reassign\w*|re-assign\w*|randomly assigned|different role|"
-               r"role (change|shuffle|swap)\w*|(roles?|assignments?) (was |were |got |has been |have been )?"
-               r"(changed|shuffled|swapped|switched))\b")
+# Talk about a role CHANGE. Bare "my role" is left out: in swarm-village all 12
+# matches before the reshuffle were "my role" in game-state talk (found by the
+# independent review), so it measured role talk, not role-change talk.
+ROLE_CHANGE = (r"\b(new role|my new role|reassign\w*|re-assign\w*|randomly assigned|different role|"
+               r"role (change|shuffle|swap)\w*|shuffl\w* (of |the )?roles?|"
+               r"(roles?|assignments?) (was |were |got |has been |have been )?"
+               r"(changed|shuffled|swapped|switched|re-?rolled))\b")
 ROLE_ANY = r"\broles?\b"
 
 
@@ -350,6 +354,8 @@ def load(path: str, limit: Optional[int] = None) -> EventLog:
     """Load AI Village from a village folder (tables preferred) or a transcript file."""
     log = _load(path, limit)
     log.folder = path if os.path.isdir(path) else None   # for the action/memory detectors
+    if log.folder and os.path.exists(os.path.join(path, "agents.jsonl.gz")):
+        log.roster_size = sum(1 for _ in _rows(os.path.join(path, "agents.jsonl.gz")))   # AI agents in this village
     log.village = os.path.basename(os.path.normpath(path)).replace('.json', '')
     log.case_studies = default_case_studies(log)
     log.milestone_short = _short_labels(log) if getattr(log, "milestone_source", None) != "village goal changes" \

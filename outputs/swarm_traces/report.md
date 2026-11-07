@@ -162,7 +162,7 @@ _How to read this:_ `credential_reuse` and `signed_cmd` fire months early but ar
 
 **When did it happen? (anchor propagation, weighted median of linked dated events)**
 
-- Held-out test on 4735 clock-precise anchors: coverage 0.68, median error **0.01 h**, 80th percentile 2.08 h, 90th percentile 14.24 h, 93.7% within 24 h. Baseline (always guess the median time): 18.6 h.
+- Held-out test on 4735 clock-precise anchors: coverage 0.68, median error **0.01 h**, 80th percentile 2.15 h, 90th percentile 14.24 h, 93.7% within 24 h. Baseline (always guess the median time): 18.6 h.
 - Result: dated events go from **5,955** (3.1%) to **20,155** (10.6%).
 - **Negative result:** the order of redaction numbers does not tell time. A monotone fit from number to time is worse than always guessing the median:
 
@@ -195,7 +195,7 @@ _How to read this:_ `credential_reuse` and `signed_cmd` fire months early but ar
 | Evaluation tampering | SwarmScope Targets the benchmark or scorer | 3,551 | 55 |
 | Outside model use | SwarmScope Calls outside language models | 70 | 0 |
 
-Roles (each agent's main tactic, leaving out the board-token flag that every named agent has by construction): Credential use 120, Command and Control 97, Persistence 7, Evaluation tampering 4, Stealth / Defense Evasion 3, Discovery 1. Cover set: WT8592N, GEOS33474.
+Roles (each agent's main tactic, leaving out the board-token flag that every named agent has by construction): Credential use 122, Command and Control 92, Persistence 7, Evaluation tampering 6, Stealth / Defense Evasion 3, Discovery 2. Cover set: WT8592N, GEOS33474.
 
 **Who and when** (Zhang et al., 2025): the first dated event for each tactic.
 

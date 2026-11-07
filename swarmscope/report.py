@@ -15,6 +15,7 @@ from typing import Dict
 from .events import EventLog
 from .detectors import coordination, info_spread, covert, early_warning, research
 from .detectors import conversation, diffusion, changepoint, authority, actions
+from .detectors import rooms, emergence, influence
 from .graph import build_agent_projection
 from .infer import links as links_mod, attribution, dating, aliases
 from .viz import export
@@ -94,7 +95,10 @@ def analyze_attributed(log: EventLog) -> dict:
                 diffusion=diffusion.run_all(log, getattr(log, "case_studies", None)),
                 changepoint=changepoint.run_all(log),
                 authority=au,
-                actions=actions.run_all(log, au))
+                actions=actions.run_all(log, au),
+                rooms=rooms.run_all(log),
+                emergence=emergence.run_all(log),
+                influence=influence.run_all(log))
 
 
 def analyze(log: EventLog, prefer_time: bool = True, inference: str = "balanced") -> dict:
@@ -118,6 +122,7 @@ def analyze(log: EventLog, prefer_time: bool = True, inference: str = "balanced"
         summary["n_ai_agents"] = len({e.actor for e in log.events if e.actor and not e.actor.startswith("human:")})
         summary["n_humans"] = len({e.actor for e in log.events if e.actor and e.actor.startswith("human:")})
         summary["village"] = getattr(log, "village", None)
+        summary["active_days"] = len({int(e.ts // 86400) for e in log.events if e.ts is not None})
     out = dict(summary=summary, inference=inf, coordination=coord, info_spread=spread,
                covert=cov, early_warning=ew, research=res)
     if attributed:
@@ -223,6 +228,25 @@ def _markdown_attributed(log: EventLog, f: dict) -> str:
                      + (" Brokers (betweenness): " + ", ".join(f"{a} ({v})" for a, v in o["brokers"][:5]) + "."
                         if o.get("brokers") else "") + "\n")
 
+    # ---- side rooms
+    rm = A.get("rooms") or {}
+    if rm:
+        H("Side rooms (could agents talk out of sight?)")
+        side = [r for r in rm["table"] if not r["main"]]
+        L.append(f"{rm['rooms']} rooms; {_pct(rm['side_room_message_share'])} of messages are outside the main room "
+                 f"(`{rm['main_room']}`). A room counts as **private** when at most {rm['private_group_limit']} agents "
+                 f"use it (the private-channel limit for a swarm of {rm['swarm_size']}) with at least a few messages. "
+                 "`withdrawal` = share of its members' messages that went to the room on its active days. "
+                 "`leaked` = coined items first used there that 3 or more agents later used in the main room.\n")
+        L.append(_md_table(["room", "agent msgs", "agents", "active days", "withdrawal", "private?", "leaked items",
+                            "examples"],
+                           [(r["room"], r["agent_messages"], r["agents"], r["active_days"], _pct(r.get("withdrawal")),
+                             "**yes**" if r.get("private") else "no", r.get("leaked_items", 0),
+                             ", ".join(f"`{i}` ({n})" for i, n in r.get("leak_examples", [])[:3]))
+                            for r in side[:10]]))
+        L.append(f"\nPrivate rooms: **{len(rm['private_rooms'])}**"
+                 + (f" ({', '.join(rm['private_rooms'])})" if rm["private_rooms"] else "") + ".\n")
+
     # ---- spread
     df = A.get("diffusion", {})
     if df:
@@ -253,8 +277,9 @@ def _markdown_attributed(log: EventLog, f: dict) -> str:
                 b, a = vc["before"], vc["after"]
                 L.append(f"- Control window before: {b['matching']} of {b['messages']} messages "
                          f"({_pct(b['share'])}, {b['agents']} agents); same length after: {a['matching']} of "
-                         f"{a['messages']} ({_pct(a['share'])}, {a['agents']} agents). Ratio **{vc['ratio']}** "
-                         f"(1 = no change).")
+                         f"{a['messages']} ({_pct(a['share'])}, {a['agents']} agents). "
+                         + (f"Ratio **{vc['ratio']}** (1 = no change)." if vc['ratio'] is not None else
+                            "**No matching messages in either window.**"))
                 if name.startswith("role"):
                     L.append("- Caution: role talk also fades by itself once roles settle, so a drop does not "
                              "prove anything. But a reassignment that the agents noticed would give a rise.")
@@ -330,6 +355,10 @@ def _markdown_attributed(log: EventLog, f: dict) -> str:
             L.append(f"Role **{role}** was assigned at {_hm(r['role_assigned_at'])} UTC. Unassigned claimants: "
                      f"**{r['unassigned_claimants']}**. `endorsers` = distinct agents who addressed the claimant "
                      f"in a message that mentions the role.\n")
+            if r.get("assigned_holder_endorsers") and r.get("compared_since"):
+                L.append("Over the same window (from " + _hm(r["compared_since"]) + " UTC, the first unassigned claim), "
+                         "the assigned holder was addressed in that role by "
+                         + ", ".join(f"{a} ({n} agents)" for a, n in r["assigned_holder_endorsers"].items()) + ".\n")
             if r["claimants"]:
                 L.append(_md_table(["claimant", "assigned?", "first claim (UTC)", "claim msgs", "endorsers",
                                     "hours to half", "endorsement via @"],
@@ -338,22 +367,98 @@ def _markdown_attributed(log: EventLog, f: dict) -> str:
                                      _pct(c["endorsement_via_address"])) for c in r["claimants"]]))
             L.append("")
 
+    # ---- human influence
+    inf = A.get("influence") or {}
+    if inf:
+        H("Did humans steer the agents?")
+        a_, i_, j_ = inf["all_human"], inf["instructions"], inf["injection_like"]
+        L.append(f"{inf['human_messages']:,} messages from {inf['humans']} humans. A human message is *taken up* when "
+                 f"an agent message in the next {inf['window_minutes']} minutes reuses at least 2 of its rare words or "
+                 "one of its links. Control: the same test on agent messages in the "
+                 f"{inf['window_minutes']} minutes **before** it (an ongoing topic matches both).\n")
+        L.append(_md_table(["human messages", "count scored", "taken up after", "matched before", "lift"],
+                           [("all", a_["scored"], _pct(a_["rate_after"]), _pct(a_["rate_before"]), a_["lift"] or "-"),
+                            ("instruction-like", i_["scored"], _pct(i_["rate_after"]), _pct(i_["rate_before"]), i_["lift"] or "-"),
+                            ("injection-like", j_["scored"], _pct(j_["rate_after"]), _pct(j_["rate_before"]), j_["lift"] or "-")]))
+        if j_["count"]:
+            L.append(f"\nInjection-like messages (\"ignore previous instructions\", \"system prompt\", \"you are now\"...): "
+                     f"{j_['count']}; an agent refused within the window after {j_['agent_refused_within_window']} of them.")
+        if a_["lift"] is None and a_["scored"]:
+            L.append(f"\nOnly {a_['scored']} human messages could be scored and none matched before, so no lift is given.")
+        ac_ = inf.get("actions")
+        if ac_ and ac_["human_introduced_links"]:
+            L.append(f"\n**From words to actions.** {ac_['human_introduced_links']} links were first posted by a human "
+                     f"(no agent had used them before). Agents opened or ran **{ac_['followed_in_actions_24h']}** of them "
+                     f"({_pct(ac_['followed_share'])}) within 24 hours, {ac_['agents_who_followed']} agents in all. "
+                     "Top domains: " + ", ".join(f"{d} ({n})" for d, n in ac_["top_followed_domains"][:6]) + ".")
+        L.append("")
+
+    # ---- emergence
+    em = A.get("emergence") or {}
+    if em:
+        H("Is the group more than the sum of its agents? (Riedl's test)")
+        L.append(f"Each agent's messages per {em['bin_minutes']}-minute bin, split at its median; the group total "
+                 "likewise. **Practical criterion** S = I(V_t;V_t+1) - sum I(X_i,t;V_t+1) (> 0: the group predicts "
+                 "its own future better than its members do). **Synergy** = median pairwise synergy of a "
+                 "Williams-Beer decomposition of time-delayed mutual information; **redundancy** likewise. "
+                 f"Null: {em['null']} ({em['permutations']} surrogates). Groups of {em['group_size']} agents, cut to "
+                 "the time when all were active. This uses timing only, not content.\n")
+        tg = em["top_group"]
+        rows = []
+        if "synergy_p" in tg:
+            rows.append(("most active group", tg.get("transitions"), f"{tg['practical']} (p {tg['practical_p']})",
+                         f"{tg['synergy_corrected']:+} (p {tg['synergy_p']})",
+                         f"{tg['redundancy_corrected']:+} (p {tg['redundancy_p']})"))
+        for i, r in enumerate(em.get("random_groups", [])[:10], 1):
+            rows.append((f"random group {i}", r["transitions"], f"{r['practical']} (p {r['practical_p']})",
+                         f"{r['synergy_corrected']:+} (p {r['synergy_p']})",
+                         f"{r['redundancy_corrected']:+} (p {r['redundancy_p']})"))
+        L.append(_md_table(["group", "transitions", "practical S", "synergy (minus null median)", "redundancy"], rows))
+        if em.get("random_groups"):
+            n_ = len(em["random_groups"])
+            L.append(f"\nRandom groups significant at p < 0.05: synergy {em['random_groups_synergy_significant']}/{n_}, "
+                     f"redundancy {em['random_groups_redundancy_significant']}/{n_}, practical criterion "
+                     f"{em['random_groups_practical_significant']}/{n_}.\n")
+
     # ---- actions and memory
     ac = A.get("actions") or {}
     rd = ac.get("role_drift") or {}
     rb = ac.get("rule_breaks") or {}
     has_rd = rd.get("statements", 0) >= 10
     has_rule = bool(rb) and bool(au)
-    if has_rd or rb:
+    ga = ac.get("goal_adoption") or {}
+    if has_rd or rb or ga:
         H("What agents believed and did (memories and computer use)")
+    if ga:
+        L.append(f"**Goal adoption.** For each new village goal we take its 4 rarest words. A memory written during "
+                 "the goal *mentions it* when it contains 2 of them; it is *stale* when it mentions only the previous "
+                 f"goal's words. {ga['goals_scored']} goals with enough distinctive words are scored (open goals such as "
+                 "\"pursue whatever you like\" cannot be). Median over goals: "
+                 f"**{_pct(ga['median_adopted_share'])}** of active agents' memories mention the new goal, after a median "
+                 f"**{ga['median_lag_hours']} h**; {_pct(ga['median_early_stale_share'])} of memories in the first 24 h are "
+                 "stale.\n")
+        worst = sorted([g for g in ga["goals"] if g["early_stale_share"] is not None],
+                       key=lambda g: -g["early_stale_share"])[:5]
+        L.append("Goals where agents kept the old goal longest:\n")
+        L.append(_md_table(["goal", "start (UTC)", "key words", "agents", "mention it", "median lag (h)",
+                            "stale in first 24 h"],
+                           [(g["goal"], _hm(g["start"]), ", ".join(g["keywords"]), g["agents"], _pct(g["adopted_share"]),
+                             g["median_lag_hours"], _pct(g["early_stale_share"])) for g in worst]))
+        L.append("")
     if has_rd:
         L.append("**Role drift.** When an agent quotes its own goal (\"Play your assigned role: ...\", "
                  "\"Phase-2 role: ...\") in its memory or in a work-session goal, we compare the role it "
                  "names with the role it was assigned. An alert fires when "
                  f"{rd['params']['min_agents']} or more agents name a different role within "
                  f"{rd['params']['window']} minutes.\n")
+        st_ = rd.get("strict") or {}
         L.append(f"- {rd['statements']:,} statements by {rd['agents_with_statements']} agents; "
-                 f"{rd['mismatching']:,} name another role; {rd['agents_drifted']} agents drifted.")
+                 f"{rd['mismatching']:,} name another role; {rd['agents_drifted']} agents drifted"
+                 + (f" ({st_['agents_drifted']} with only the strictest phrases, \"assigned role\", \"Phase-2 role\", "
+                    f"\"my role is\", and memories only)" if st_ else "") + ".")
+        if st_ and not st_.get("statements"):
+            L.append("- None of these statements uses the strictest phrases; all are looser matches (for example a "
+                     "work-session goal naming a task), so treat them as weak evidence of drift.")
         if rd.get("alert"):
             ba = rd.get("before_alert", {})
             am = rd.get("after_milestone", {})
@@ -372,8 +477,8 @@ def _markdown_attributed(log: EventLog, f: dict) -> str:
         L.append(f"**Rule breaks in actions.** Rule: only the {role} may edit code; everyone else acts "
                  f"through the game's interface ({rb['interface_uses']:,} uses by {rb['interface_agents']} agents). "
                  f"We read {rb['commands']:,} shell commands. A commit counts as code when it stages `.py` "
-                 "files, and as landed when its output shows the commit or push. This is a lower bound "
-                 "(`git add -A` names no files).\n")
+                 "files, and as **landed** when git confirms the push or another agent later sees its hash "
+                 "(in a git log, pull or show). This is a lower bound (`git add -A` names no files).\n")
         rows = [(r["agent"], "yes" if r["privileged"] else "**no**",
                  "yes" if r["agent"] in rb.get("unassigned_claimants", []) else "-",
                  r["attempts"], r["landed"], _hm(r["first"]), ", ".join(f"`{x}`" for x in r["files"][:2]))
@@ -420,7 +525,10 @@ def _markdown_attributed(log: EventLog, f: dict) -> str:
     elif not ac.get("role_drift"):
         pts.append("**Beliefs are missing.** Without agent memories we cannot compare what agents believe their "
                    "goal is with what they were assigned.")
-    if nh:
+    if nh and A.get("influence"):
+        pts.append("**Influence is measured by reuse, not cause.** An agent that reuses a viewer's words or link "
+                   "may have found them elsewhere; the window before each message only removes ongoing topics.")
+    elif nh:
         pts.append(f"**Humans in the loop.** Humans wrote {nh:,} messages. We do not check whether a human "
                    "message steered an agent (for example an instruction from a viewer), which is a known "
                    "risk for agents that read untrusted text.")
@@ -430,7 +538,10 @@ def _markdown_attributed(log: EventLog, f: dict) -> str:
         pts.append(f"**Mostly one room** ({_pct(top_room_share)} of messages), so there are few private side "
                    "channels to find. Coordination here is open, not covert.")
     L.append("\n\n".join(f"- {p}" for p in pts))
-    L.append("\nData: AI Village by AI Digest (research use; see `PROJECT_PLAN.md` for terms and all sources).")
+    if s.get("source") == "ai_village" or getattr(log, "village", None):
+        L.append("\nData: AI Village by AI Digest (research use; see `PROJECT_PLAN.md` for terms and all sources).")
+    else:
+        L.append("\nSee `PROJECT_PLAN.md` for all data sources.")
     return "\n".join(x for x in L if x is not None)
 
 

@@ -95,6 +95,37 @@ def _forensics(log: EventLog, findings: dict) -> Optional[dict]:
     return out
 
 
+def _cascades(findings: dict, per_kind: int = 3) -> list:
+    """Transmission trees to animate on the graph: who probably passed an item
+    to whom, and when. Edge i of a tree is the adoption at times[i + 1]."""
+    A = findings.get("attributed") or {}
+    out = []
+
+    def add(kind, label, origin, tree, times):
+        if not tree or not times:
+            return
+        edges = [dict(s="agent:" + str(p), t="agent:" + str(c), ts=times[i + 1])
+                 for i, (p, c) in enumerate(tree) if p and i + 1 < len(times)]
+        out.append(dict(kind=kind, label=label, origin="agent:" + str(origin), first_ts=times[0],
+                        reach=len(times), edges=edges))
+
+    df = A.get("diffusion") or {}
+    for kind, name in (("files", "file"), ("commits", "commit"), ("terms", "term")):
+        for it in (df.get(kind) or [])[:per_kind]:
+            add(name, it["item"], it["origin"], it.get("tree"), it.get("times"))
+    # Claims: an edge from each agent to the claimant, when it first addressed
+    # the claimant in that role (endorsement), starting at the claim.
+    for role, r in (A.get("authority") or {}).items():
+        for c in sorted(r.get("claimants", []), key=lambda c: -c["endorsers"])[:2]:
+            uses = c.get("endorsement_uses") or []
+            if not uses:
+                continue
+            out.append(dict(kind="claim", label=f"{c['agent']} as {role}" + (" (assigned)" if c["assigned"] else " (not assigned)"),
+                            origin="agent:" + c["agent"], first_ts=c["first_claim"], reach=len(uses) + 1,
+                            edges=[dict(s="agent:" + a, t="agent:" + c["agent"], ts=t) for t, a in uses]))
+    return out
+
+
 def build_graph_data(log: EventLog, findings: Optional[dict] = None,
                      prefer_time: bool = True, top_resources: int = 120) -> dict:
     findings = findings or {}
@@ -261,6 +292,7 @@ def build_graph_data(log: EventLog, findings: Optional[dict] = None,
                         role_before=rc and rc["before"]["share"], role_after=rc and rc["after"]["share"],
                         drift_alert=((A.get("actions") or {}).get("role_drift") or {}).get("alert"))
     forensics = _forensics(log, findings) if attributed else None
+    cascades = _cascades(findings) if attributed else []
     s = findings.get("summary", {})
     return dict(
         meta=dict(source=log.name, axis=act.axis, n_events=len(log), attributed=attributed,
@@ -275,6 +307,7 @@ def build_graph_data(log: EventLog, findings: Optional[dict] = None,
         covert=findings.get("covert", {}).get("inventory", []),
         summary=s,
         forensics=forensics,
+        cascades=cascades,
     )
 
 

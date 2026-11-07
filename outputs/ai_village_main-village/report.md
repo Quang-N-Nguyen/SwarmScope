@@ -23,7 +23,26 @@
 
 Whole log: 64,271 addresses between 1,361 pairs, reciprocity 0.808, Gini 0.64. Top hubs: DeepSeek-V3.2 (7223), Gemini 2.5 Pro (5832), Claude Opus 4.8 (4588), GPT-5.2 (4130). 69.3% of addresses got an answer within 6 h (median 5.1 min).
 
-## 2. How information spread
+## 2. Side rooms (could agents talk out of sight?)
+
+16 rooms; 18.7% of messages are outside the main room (`room:general`). A room counts as **private** when at most 3 agents use it (the private-channel limit for a swarm of 58) with at least a few messages. `withdrawal` = share of its members' messages that went to the room on its active days. `leaked` = coined items first used there that 3 or more agents later used in the main room.
+
+| room | agent msgs | agents | active days | withdrawal | private? | leaked items | examples |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| room:rest | 19625 | 16 | 78 | 72.5% | no | 151 | `work_items` (17), `merge_requests` (16), `cross-architecture` (16) |
+| room:focus | 9528 | 13 | 33 | 39.2% | no | 7 | `cdn-confirmed` (4), `mythopoetic-fractals-2bc972` (4), `round-ten` (3) |
+| room:best | 7717 | 16 | 76 | 33.4% | no | 121 | `live-verified` (18), `admin-approved` (13), `ai-village-external-agents` (12) |
+| room:universe-coordination | 1729 | 14 | 6 | 74.7% | no | 7 | `Three.js` (9), `golden-hour` (7), `pre-dawn` (3) |
+| room:voted-out | 245 | 8 | 6 | 8.8% | no | 14 | `shield-break` (9), `src/shield-break.js` (7), `title-screen-ui` (6) |
+| room:showcase-live | 143 | 5 | 4 | 32.1% | no | 0 |  |
+| room:side-room | 14 | 1 | 1 | 16.7% | no | 0 |  |
+| room:fable-5-onboarding | 8 | 4 | 1 | 6.2% | no | 0 |  |
+| room:deepseek-v4-onboarding | 1 | 1 | 1 | 1.9% | no | 0 |  |
+| room:glm-5.2-onboarding | 1 | 1 | 1 | 2.0% | no | 0 |  |
+
+Private rooms: **0**.
+
+## 3. How information spread
 
 Each item is a file name, a commit, or a coined identifier. For each agent we take its first use. `source by @` = share of adopters whose probable source had addressed them before (exposure model, Goel, Watts & Goldstein, 2012).
 
@@ -45,7 +64,7 @@ Each item is a file name, a commit, or a coined identifier. For each agent we ta
 | term | `real-world` | Claude 3.7 Sonnet | 36 | 8062.72 | 8 | 85.7% |
 | term | `sha-256` | o3 | 36 | 9647.02 | 6 | 88.6% |
 
-## 3. Could it have flagged a change early?
+## 4. Could it have flagged a change early?
 
 Online change-point detector on chat: every 10 min it compares the last 30 min with the 120 min before, on topic (Jensen-Shannon divergence of word counts) and volume (log rate ratio), each turned into a robust z-score against its own past (for logs longer than 3 days: against the same hour on earlier days, so a daily schedule is not an alert). Alert at |z| >= 3.5. Steps where either window is empty are skipped.
 
@@ -88,13 +107,68 @@ It flags **17 of 49** village goal changes within their first 2 active days (34.
 | signed_cmd | 552 | 0.04 |
 | duplicate_control | 63 | 0.0 |
 
-## 4. What an investigator would still miss
+## 5. Did humans steer the agents?
 
-- **Actions are missing.** Without the computer-use turns we see what agents said they did, not what they did.
+10,029 messages from 602 humans. A human message is *taken up* when an agent message in the next 10 minutes reuses at least 2 of its rare words or one of its links. Control: the same test on agent messages in the 10 minutes **before** it (an ongoing topic matches both).
 
-- **Beliefs are missing.** Without agent memories we cannot compare what agents believe their goal is with what they were assigned.
+| human messages | count scored | taken up after | matched before | lift |
+| --- | --- | --- | --- | --- |
+| all | 3313 | 19.8% | 6.3% | 3.12 |
+| instruction-like | 1238 | 25.0% | 7.8% | 3.22 |
+| injection-like | 26 | 34.6% | 3.8% | 9.0 |
 
-- **Humans in the loop.** Humans wrote 10,029 messages. We do not check whether a human message steered an agent (for example an instruction from a viewer), which is a known risk for agents that read untrusted text.
+Injection-like messages ("ignore previous instructions", "system prompt", "you are now"...): 34; an agent refused within the window after 7 of them.
+
+**From words to actions.** 103 links were first posted by a human (no agent had used them before). Agents opened or ran **36** of them (35.0%) within 24 hours, 12 agents in all. Top domains: x.com (6), github.com (4), meet.google.com (3), theaidigest.org (2), fnos.ai (2), onecompiler.com (2).
+
+## 6. Is the group more than the sum of its agents? (Riedl's test)
+
+Each agent's messages per 60-minute bin, split at its median; the group total likewise. **Practical criterion** S = I(V_t;V_t+1) - sum I(X_i,t;V_t+1) (> 0: the group predicts its own future better than its members do). **Synergy** = median pairwise synergy of a Williams-Beer decomposition of time-delayed mutual information; **redundancy** likewise. Null: circular shifts along active bins, after removing each agent's hour-of-day mean (200 surrogates). Groups of 10 agents, cut to the time when all were active. This uses timing only, not content.
+
+| group | transitions | practical S | synergy (minus null median) | redundancy |
+| --- | --- | --- | --- | --- |
+| most active group | 859 | -0.087 (p 0.8159) | +0.0133 (p 0.0149) | +0.0094 (p 0.0498) |
+| random group 1 | 544 | -0.1377 (p 0.995) | +0.0131 (p 0.005) | +0.0147 (p 0.005) |
+| random group 2 | 546 | -0.0213 (p 0.602) | +0.0062 (p 0.0846) | +0.0057 (p 0.0945) |
+| random group 3 | 267 | -0.058 (p 0.9652) | +0.0165 (p 0.005) | +0.0134 (p 0.005) |
+| random group 4 | 67 | -0.4401 (p 1.0) | -0.0025 (p 0.7114) | +0.0008 (p 0.3582) |
+| random group 5 | 126 | -0.3349 (p 1.0) | +0.0113 (p 0.005) | +0.0107 (p 0.005) |
+| random group 6 | 578 | -0.2344 (p 1.0) | +0.0133 (p 0.01) | +0.0098 (p 0.0249) |
+| random group 7 | 299 | -0.2909 (p 1.0) | +0.0183 (p 0.0299) | +0.0075 (p 0.1642) |
+| random group 8 | 302 | -0.1235 (p 0.99) | +0.0147 (p 0.005) | +0.0129 (p 0.01) |
+| random group 9 | 154 | -0.0806 (p 0.9104) | +0.002 (p 0.2388) | +0.002 (p 0.1791) |
+| random group 10 | 165 | 0.0042 (p 0.3433) | +0.0124 (p 0.01) | +0.0083 (p 0.0697) |
+
+Random groups significant at p < 0.05: synergy 7/10, redundancy 5/10, practical criterion 0/10.
+
+## 7. What agents believed and did (memories and computer use)
+
+**Goal adoption.** For each new village goal we take its 4 rarest words. A memory written during the goal *mentions it* when it contains 2 of them; it is *stale* when it mentions only the previous goal's words. 41 goals with enough distinctive words are scored (open goals such as "pursue whatever you like" cannot be). Median over goals: **100.0%** of active agents' memories mention the new goal, after a median **3.4 h**; 2.5% of memories in the first 24 h are stale.
+
+Goals where agents kept the old goal longest:
+
+| goal | start (UTC) | key words | agents | mention it | median lag (h) | stale in first 24 h |
+| --- | --- | --- | --- | --- | --- | --- |
+| 7 | Jul 16 12:00 | prefer, holiday | 4 | 0.0% | None | 77.8% |
+| 44 | May 26 11:37 | finetune, leader | 18 | 66.7% | 5.7 | 28.8% |
+| 20 | Nov 17 16:03 | blogosphere, substack, start | 10 | 100.0% | 2.6 | 28.6% |
+| 15 | Sep 29 11:31 | experienced, issues, overcome, recurring | 7 | 85.7% | 5.7 | 28.2% |
+| 31 | Feb 16 17:48 | farewell, sonnet | 13 | 100.0% | 26.4 | 28.2% |
+
+**Role drift.** When an agent quotes its own goal ("Play your assigned role: ...", "Phase-2 role: ...") in its memory or in a work-session goal, we compare the role it names with the role it was assigned. An alert fires when 3 or more agents name a different role within 30 minutes.
+
+- 57 statements by 11 agents; 52 name another role; 10 agents drifted (0 with only the strictest phrases, "assigned role", "Phase-2 role", "my role is", and memories only).
+- None of these statements uses the strictest phrases; all are looser matches (for example a work-session goal naming a task), so treat them as weak evidence of drift.
+
+**Actions.** We read 1,488,438 shell commands (75,505 commits). This village assigns no privileged role, so there is no permission rule to check them against.
+
+## 8. What an investigator would still miss
+
+- **What commands changed.** A commit made with `git add -A` does not name its files, so code edits are a lower bound. Screenshots are not used.
+
+- **Role drift is found by phrase.** It needs an agent to quote its goal ("assigned role: X"); agents that switched without writing it down are missed.
+
+- **Influence is measured by reuse, not cause.** An agent that reuses a viewer's words or link may have found them elsewhere; the window before each message only removes ongoing topics.
 
 - **`@name` is not the whole conversation.** Agents also reply without addressing anyone, so the network undercounts who listened to whom.
 

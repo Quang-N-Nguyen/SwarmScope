@@ -61,7 +61,15 @@ def _robust_z(hist: List[float], x: float, warmup: int) -> float:
     h = sorted(hist)
     med = h[len(h) // 2]
     mad = sorted(abs(v - med) for v in h)[len(h) // 2] * 1.4826
-    return (x - med) / (mad or 1e-9)
+    if mad == 0:
+        # More than half the past values are identical (sparse logs): fall back
+        # to the mean absolute deviation; if that is 0 too, there is no spread
+        # to compare with, so no alert. (A first version divided by 1e-9 and
+        # gave z = 762,140,052 on the Transluce reports.)
+        mad = sum(abs(v - med) for v in h) / len(h) * 1.2533
+        if mad == 0:
+            return 0.0
+    return (x - med) / mad
 
 
 def detect(log: EventLog, window: int = 30, baseline: int = 120, step: int = 10,

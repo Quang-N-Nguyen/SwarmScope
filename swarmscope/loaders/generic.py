@@ -80,7 +80,10 @@ def load(path: str, field_map: Dict[str, str], name: str = "generic",
             if isinstance(recips, str):
                 recips = [recips]
             ts = _parse_ts(_dig(row, field_map.get("ts")))
-            kind = str(_dig(row, field_map.get("kind")) or "message")
+            # Every record of a generic log is a message: kind "chat", so the
+            # chat detectors apply. A mapped "kind" field is kept as a tag/type.
+            rtype = str(_dig(row, field_map.get("kind")) or "message")
+            kind = "chat"
 
             refs = extract.extract_refs(text)
             feats = extract.extract_features(text)
@@ -107,7 +110,7 @@ def load(path: str, field_map: Dict[str, str], name: str = "generic",
                 ts_source="native" if ts is not None else "none",
                 text_len=len(text),
                 parent_id=_dig(row, field_map.get("parent_id")),
-                tags=[],
-                meta={"text_lc": extract.mask_text_secrets(text).lower()},
+                tags=[rtype],
+                meta={"text_lc": extract.mask_text_secrets(text).lower(), "type": rtype},
             ))
     return EventLog(events, name=name)

@@ -166,6 +166,11 @@
       </div>
       <div class="hint" id="mode-hint"></div>
     </div>
+    <div class="sec" id="follow-sec" hidden>
+      <h2>Follow an item</h2>
+      <select id="follow" aria-label="Item to follow"><option value="">— none —</option></select>
+      <div class="hint" id="follow-hint">Pick a file, commit, coined term or role claim. Arrows show who probably passed it to whom, and appear when each agent adopts it. Press play.</div>
+    </div>
 
     <div class="sec">
       <h2>Reveal</h2>
@@ -289,6 +294,7 @@ const HAS_CLOCK = !!(CLOCK.n_timed && CLOCK.window);
 let axis = HAS_CLOCK ? 'clock' : 'discovery';
 let range = 'week';
 let mode = 'activity', timeMode = 'cumulative', mech = '', showInf = true;
+let follow = null;   // cascade being followed (see "Follow an item")
 const kindOn = {use:true, deliver:true, coordinate:true};
 let lo = 0, hi = MAXPOS, t = MAXPOS, W = 1;
 let playing = false, speed = 2;
@@ -392,12 +398,34 @@ function draw(){
     ctx.beginPath(); ctx.moveTo(s.x,s.y); ctx.lineTo(g.x,g.y); ctx.stroke();
   }
   ctx.setLineDash([]); ctx.globalAlpha=1;
+  // ---- followed item: transmission arrows up to the current time
+  let adopted=null;
+  if(follow && axis==='clock'){
+    adopted=new Set(); if(follow.first_ts<=t) adopted.add(follow.origin);
+    const col=getVar('--accent2'); ctx.strokeStyle=col; ctx.fillStyle=col; ctx.lineWidth=2/transform.k;
+    for(const e of follow.edges){
+      if(e.ts>t) continue;
+      adopted.add(e.s); adopted.add(e.t);
+      const a=nodeById.get(e.s), b=nodeById.get(e.t); if(!a||!b||a.x==null||b.x==null) continue;
+      const dx=b.x-a.x, dy=b.y-a.y, L=Math.hypot(dx,dy)||1, r=sizeOf(b)+2, ex=b.x-dx/L*r, ey=b.y-dy/L*r;
+      const fresh = t-e.ts < (hi-lo)*0.02;
+      ctx.globalAlpha = fresh ? 1 : 0.6;
+      ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(ex,ey); ctx.stroke();
+      const h=6/transform.k, an=Math.atan2(dy,dx);
+      ctx.beginPath(); ctx.moveTo(ex,ey); ctx.lineTo(ex-h*Math.cos(an-0.45),ey-h*Math.sin(an-0.45)); ctx.lineTo(ex-h*Math.cos(an+0.45),ey-h*Math.sin(an+0.45)); ctx.closePath(); ctx.fill();
+    }
+    ctx.globalAlpha=1;
+    const fh=document.getElementById('follow-hint');
+    fh.textContent = `${follow.kind} · ${adopted.size} of ${follow.reach} agents so far (${fmtTime(Math.min(t,hi))}). `
+      + (follow.kind==='claim' ? 'Arrows: an agent addresses the claimant in that role.' : 'Arrows: probable source → adopter (the earlier user who last @-addressed them, else the latest earlier user).');
+  }
   for(const n of activeNodes()){
     if(!nodeVisible(n)) continue; visN++;
     const r=sizeOf(n); if(r<=0||n.x==null) continue;
     ctx.beginPath();
     if(n.ty==='agent') ctx.arc(n.x,n.y,r,0,6.283); else ctx.rect(n.x-r,n.y-r,2*r,2*r);
-    ctx.fillStyle=nodeColor(n); ctx.globalAlpha = mechDim(n)?0.12:1; ctx.fill();
+    ctx.fillStyle=nodeColor(n); ctx.globalAlpha = (mechDim(n) || (adopted && n.ty==='agent' && !adopted.has(n.id)) || (adopted && n.ty!=='agent')) ? 0.12 : 1; ctx.fill();
+    if(adopted && adopted.has(n.id)){ ctx.lineWidth=(n.id===follow.origin?3:1.5)/transform.k; ctx.strokeStyle=getVar('--accent2'); ctx.stroke(); }
     if(mechGlow(n)){ ctx.lineWidth=2/transform.k; ctx.strokeStyle=getVar('--ink'); ctx.stroke(); }
     if(n===selected){ ctx.lineWidth=2.5/transform.k; ctx.strokeStyle=getVar('--accent'); ctx.stroke(); }
     ctx.globalAlpha=1;
@@ -598,6 +626,21 @@ document.getElementById('ax-clock').addEventListener('click',()=>{ if(!HAS_CLOCK
 document.getElementById('ax-disc').addEventListener('click',()=>{ axis='discovery'; applyAxis(); });
 document.getElementById('rg-week').addEventListener('click',()=>{ range='week'; applyRange(); });
 document.getElementById('rg-all').addEventListener('click',()=>{ range='all'; applyRange(); });
+// ---------- follow an item (transmission trees from the diffusion / authority detectors)
+const CASC = DATA.cascades || [];
+if(CASC.length && HAS_CLOCK){
+  document.getElementById('follow-sec').hidden=false;
+  const sel=document.getElementById('follow');
+  CASC.forEach((c,i)=>{ const o=document.createElement('option'); o.value=i; o.textContent=`${c.kind}: ${c.label.slice(0,38)} (${c.reach})`; sel.appendChild(o); });
+  sel.addEventListener('change',()=>{
+    follow = sel.value==='' ? null : CASC[+sel.value];
+    if(follow){
+      if(axis!=='clock'){ axis='clock'; applyAxis(); }
+      if(follow.first_ts<lo || follow.first_ts>hi){ range='all'; applyRange(); }
+      setT(follow.first_ts);
+    } else { document.getElementById('follow-hint').textContent='Pick a file, commit, coined term or role claim. Arrows show who probably passed it to whom, and appear when each agent adopts it. Press play.'; draw(); }
+  });
+}
 if(!HAS_CLOCK) document.getElementById('ax-clock').disabled=true;
 function setMode(m){
   mode=m; seg(m==='activity'?'mode-activity':'mode-coord',[m==='activity'?'mode-coord':'mode-activity']);
