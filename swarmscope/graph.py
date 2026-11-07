@@ -54,12 +54,14 @@ _CHANNEL_REF_TYPES = ("destination", "credential", "repo", "webhook")
 
 
 def build_activity_graph(log: EventLog, prefer_time: bool = True,
-                         top_resources: int = 120) -> TemporalGraph:
+                         top_resources: int = 120, use_inferred: bool = True) -> TemporalGraph:
     """Agents + the resources they touch, as a timed bipartite graph.
 
     ``top_resources`` keeps the busiest resources so the picture stays readable;
     rare one-off resources are dropped from the drawing (they are still counted
-    in detectors).
+    in detectors). With ``use_inferred``, events with an inferred author also
+    draw edges; those edges carry ``inf=True`` so the viewer can show them
+    differently from observed ones.
     """
     ordered = log.sorted_events(prefer_time)
     axis = log.time_axis(prefer_time)
@@ -78,13 +80,18 @@ def build_activity_graph(log: EventLog, prefer_time: bool = True,
     g = TemporalGraph(axis=axis)
     for e in log.events:
         pos = pos_of[e.event_id]
+        who = e.who(use_inferred)
+        inferred = who is not None and e.actor is None
         # agent node
-        if e.actor:
-            aid = f"agent:{e.actor}"
-            g.add_node(aid, "agent", e.actor, pos, e.ts)
+        if who:
+            aid = f"agent:{who}"
+            g.add_node(aid, "agent", who, pos, e.ts)
+            n = g.nodes[aid]
+            n["obs"] = n.get("obs", 0) + (0 if inferred else 1)
+            n["inf"] = n.get("inf", 0) + (1 if inferred else 0)
             for flag, on in e.features.items():
                 if on:
-                    g.nodes[aid]["features"][flag] += 1
+                    n["features"][flag] += 1
         # channel node + edge
         targets = []
         if e.channel and e.channel in keep:
@@ -99,8 +106,9 @@ def build_activity_graph(log: EventLog, prefer_time: bool = True,
             g.add_node(rr, rtype if rtype in ("mailbox", "dest", "destination",
                                               "credential", "repo", "webhook") else "resource",
                        rr, pos, e.ts)
-            if e.actor:
-                g.add_edge(f"agent:{e.actor}", rr, "use", pos, e.ts, e.event_id)
+            if who:
+                g.add_edge(f"agent:{who}", rr, "use", pos, e.ts, e.event_id)
+                g.edges[-1]["inf"] = inferred
         # recipients (channel -> recipient agent)
         for rcp in e.recipients:
             rid = f"agent:{rcp}"

@@ -7,7 +7,6 @@ Signals produced:
 
 * **shared dead-drops** -- resources touched by two or more agents (the clearest
   sign of coordination in a de-identified log)
-* **synchronised bursts** -- short windows with a spike of activity
 * **repeated dyads** -- agent pairs that interact again and again
 * **duplicate-control** -- agents claiming locks / killing rivals, i.e. one swarm
   managing itself
@@ -61,44 +60,6 @@ def shared_deaddrops(log: EventLog, min_agents: int = 2, top: int = 50) -> List[
                              coord_use=round(res_board[r] / n, 2)))
     rows.sort(key=lambda x: (-x["n_agents"], -x["n_events"]))
     return rows[:top]
-
-
-def synchronized_bursts(log: EventLog, prefer_time: bool = True,
-                        window: int = 200, z: float = 3.0) -> List[dict]:
-    """Windows along the axis with an unusually high number of events.
-
-    We slide a fixed-size window over the ordered events and flag windows whose
-    event count is ``z`` standard deviations above the mean. A spike of activity
-    is where coordinated action tends to show up.
-    """
-    ordered = log.sorted_events(prefer_time)
-    n = len(ordered)
-    if n < window * 2:
-        window = max(10, n // 10)
-    counts = []
-    for start in range(0, n, window):
-        chunk = ordered[start:start + window]
-        counts.append(len(chunk))
-    if len(counts) < 3:
-        return []
-    mean = sum(counts) / len(counts)
-    var = sum((c - mean) ** 2 for c in counts) / len(counts)
-    sd = var ** 0.5 or 1.0
-    rows = []
-    for i, c in enumerate(counts):
-        if (c - mean) / sd >= z:
-            chunk = ordered[i * window:(i + 1) * window]
-            actors = Counter(e.actor for e in chunk if e.actor)
-            feats = Counter()
-            for e in chunk:
-                for f, on in e.features.items():
-                    if on:
-                        feats[f] += 1
-            rows.append(dict(window_index=i, start_pos=i * window, n_events=c,
-                             zscore=round((c - mean) / sd, 2),
-                             top_actors=actors.most_common(5),
-                             top_mechanisms=feats.most_common(5)))
-    return rows
 
 
 def repeated_dyads(log: EventLog, prefer_time: bool = True, top: int = 40) -> List[dict]:
@@ -171,7 +132,6 @@ def run_all(log: EventLog, prefer_time: bool = True) -> dict:
     return dict(
         alias_groups=alias_groups(log),
         shared_deaddrops=shared_deaddrops(log),
-        synchronized_bursts=synchronized_bursts(log, prefer_time),
         repeated_dyads=repeated_dyads(log, prefer_time),
         duplicate_control=duplicate_control(log),
         communities=communities(log, prefer_time),

@@ -78,8 +78,19 @@ class Event:
     features: Dict[str, bool] = field(default_factory=dict)   # flag -> bool
 
     ts: Optional[float] = None        # unix seconds, if known
-    ts_source: str = "none"           # embedded | chain | order | native | none
-    order_hint: Optional[float] = None  # estimated-order key when ts is unknown
+    ts_source: str = "none"           # embedded | chain | inferred | native | none
+    ts_precision: str = "none"        # second | day | inferred | none
+    order_hint: Optional[float] = None  # discovery-order key (NOT a clock; see EventLog)
+
+    # Fine identifiers used only for inference (see extract.extract_fingerprints)
+    fingerprints: Dict[str, List[str]] = field(default_factory=dict)
+    template: str = ""                # hash of the code's shape (extract.template_hash)
+
+    # Filled by swarmscope.infer (never by loaders). Observed values stay in
+    # ``actor`` / ``ts``; inferred ones are kept apart so nothing is mixed up.
+    actor_inferred: Optional[str] = None
+    actor_inferred_conf: float = 0.0
+    persona: Optional[str] = None     # cluster id: events that probably share one author
 
     text_len: int = 0
     parent_id: Optional[str] = None
@@ -87,6 +98,12 @@ class Event:
     meta: Dict[str, Any] = field(default_factory=dict)
 
     # -- convenience ---------------------------------------------------------
+    def who(self, inferred: bool = True) -> Optional[str]:
+        """The observed actor, or (if allowed) the inferred one."""
+        if self.actor:
+            return self.actor
+        return self.actor_inferred if inferred else None
+
     def ref_list(self, ref_type: str) -> List[str]:
         return self.refs.get(ref_type, [])
 
@@ -115,17 +132,20 @@ class EventLog:
 
     # -- ordering ------------------------------------------------------------
     # We pick one ordering per log and stick to it. In priority order:
-    #   1. order_hint  -> "estimated" order (used when real time is mostly
-    #      missing but we can estimate first-appearance from the content).
+    #   1. order_hint  -> "discovery" order. Used when real time is mostly
+    #      missing. It sorts events by the first-seen number of the resources
+    #      they reference. A held-out test showed this is NOT a clock (it
+    #      predicts time worse than always guessing the median day), so it is
+    #      only an order for browsing. Real-time claims use timed_events().
     #   2. ts          -> "time" order (every event has a real timestamp).
     #   3. seq         -> "sequence" order (raw log order; last resort).
     # A loader that sets order_hint on any event opts the whole log into the
-    # estimated axis, so scales are never mixed.
+    # discovery axis, so scales are never mixed.
     def _axis_choice(self, prefer_time: bool):
         has_hint = any(e.order_hint is not None for e in self.events)
         has_time = any(e.ts is not None for e in self.events)
         if has_hint:
-            return "estimated"
+            return "discovery"
         if prefer_time and has_time:
             return "time"
         return "sequence"
@@ -133,8 +153,18 @@ class EventLog:
     def time_axis(self, prefer_time: bool = True) -> str:
         return self._axis_choice(prefer_time)
 
+    def timed_events(self, include_inferred: bool = True) -> List[Event]:
+        """Events that have a real-clock time, sorted by time.
+
+        With ``include_inferred=False`` only times read from the data itself
+        (embedded, chain, native) are used.
+        """
+        evs = [e for e in self.events if e.ts is not None
+               and (include_inferred or e.ts_source != "inferred")]
+        return sorted(evs, key=lambda e: (e.ts, e.seq))
+
     def _key(self, axis):
-        if axis == "estimated":
+        if axis == "discovery":
             big = 10 ** 9
             return lambda e: (e.order_hint if e.order_hint is not None else big + e.seq)
         if axis == "time":
@@ -147,8 +177,8 @@ class EventLog:
         return sorted(self.events, key=self._key(axis))
 
     # -- stats ---------------------------------------------------------------
-    def actors(self) -> List[str]:
-        return sorted({e.actor for e in self.events if e.actor})
+    def actors(self, inferred: bool = False) -> List[str]:
+        return sorted({e.who(inferred) for e in self.events if e.who(inferred)})
 
     def channels(self) -> List[str]:
         return sorted({e.channel for e in self.events if e.channel})

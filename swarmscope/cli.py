@@ -56,13 +56,16 @@ def main(argv=None):
     a.add_argument("--sequence", action="store_true",
                    help="force reconstruction-order axis even if timestamps exist")
     a.add_argument("--title", default=None)
+    a.add_argument("--inference", default="balanced",
+                   choices=["off", "precise", "balanced", "broad"],
+                   help="how far to infer missing authors and dates (see report.PRESETS)")
 
     args = p.parse_args(argv)
     if args.cmd == "analyze":
         log = _load(args.format, args.input, args.limit, args.map)
         prefer_time = not args.sequence
         print(f"[swarmscope] loaded {len(log):,} events from {args.input}", file=sys.stderr)
-        findings = report.analyze(log, prefer_time=prefer_time)
+        findings = report.analyze(log, prefer_time=prefer_time, inference=args.inference)
         paths = report.write_outputs(log, findings, args.out, prefer_time, args.title)
         print("[swarmscope] wrote:", file=sys.stderr)
         for k, v in paths.items():

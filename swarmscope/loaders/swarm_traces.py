@@ -108,25 +108,39 @@ def load(path: str, limit: Optional[int] = None, propagate_time: bool = True) ->
         handles = extract.extract_handles(text)
         feats = extract.extract_features(text)
         actor = handles[0] if handles else None
+        # A handle in a board token is the author when the event *writes*
+        # (creates a folder, uploads a file). When the event only reads or
+        # mentions the token, the handle may be another agent (for example,
+        # someone fetching URI23816D's shared file). Confidence says which.
+        writes = extract.looks_like_write(text)
+        actor_conf = (0.8 if writes else 0.4) if actor else 0.0
         # Any other handles in the text are treated as mentioned agents.
         if len(handles) > 1:
             refs.setdefault("handle", [])
             for h in handles[1:]:
                 if h not in refs["handle"]:
                     refs["handle"].append(h)
-        # Only trust dates inside the known incident window (May-Sep 2026).
-        # Payloads also contain unrelated dates (cert validity, copyright years,
-        # JWT claims) that would otherwise pose as event times.
-        hints = [h for h in extract.extract_time_hints(text)
-                 if INCIDENT_WINDOW[0] <= h <= INCIDENT_WINDOW[1]]
-        ts = min(hints) if hints else None
 
-        # Estimated-order key. File order is batched by record kind, so it is a
-        # poor proxy for time. Instead we order by the smallest id among the
-        # resources this record references: these ids were handed out in
-        # increasing order as the reconstruction discovered new content, so a
-        # low id means the content appeared early. It is a rough proxy (it
-        # correlates ~0.4-0.5 with the few real timestamps), never a clock.
+        # Only trust dates inside the known incident window (May-Sep 2026).
+        # Payloads also contain unrelated dates (cert validity, copyright
+        # years) that would otherwise pose as event times. Prefer clock-precise
+        # times; use the median when an event carries several.
+        hints = [(t, p) for t, p in extract.extract_time_hints_with_precision(text)
+                 if INCIDENT_WINDOW[0] <= t <= INCIDENT_WINDOW[1]]
+        precise = sorted(t for t, p in hints if p == "second")
+        days = sorted(t for t, p in hints if p == "day")
+        if precise:
+            ts, ts_prec = precise[len(precise) // 2], "second"
+        elif days:
+            ts, ts_prec = days[len(days) // 2], "day"
+        else:
+            ts, ts_prec = None, "none"
+
+        # Discovery-order key. File order is batched by record kind, so we
+        # sort by the smallest number among the resources the record
+        # references (numbers were handed out as the reconstruction found new
+        # content). A held-out test shows this is NOT a clock, so it is only
+        # used to lay events out for browsing; time claims use real dates.
         token_ids = []
         for rt in ("destination", "shortener", "credential"):
             token_ids += [int(x) for x in refs.get(rt, []) if x.isdigit()]
@@ -139,14 +153,17 @@ def load(path: str, limit: Optional[int] = None, propagate_time: bool = True) ->
             seq=seq,
             kind=r.get("kind", "payload"),
             actor=actor,
-            actor_conf=0.5 if actor else 0.0,
+            actor_conf=actor_conf,
             recipients=_recipients(text),
             channel=_primary_channel(text, refs),
             refs=refs,
             features=feats,
             ts=ts,
             ts_source="embedded" if ts is not None else "none",
+            ts_precision=ts_prec,
             order_hint=order_hint,
+            fingerprints=extract.extract_fingerprints(text),
+            template=extract.template_hash(text),
             text_len=len(text),
             parent_id=r.get("parent_id"),
             tags=tags,
@@ -175,7 +192,8 @@ def _propagate_time(log: EventLog) -> None:
             if e.parent_id and e.parent_id in log.by_id:
                 p = log.by_id[e.parent_id]
                 if e.ts is None and p.ts is not None:
-                    e.ts = p.ts; e.ts_source = "chain"; changed += 1
+                    e.ts = p.ts; e.ts_source = "chain"; e.ts_precision = p.ts_precision
+                    changed += 1
                 if e.order_hint is None and p.order_hint is not None:
                     e.order_hint = p.order_hint; changed += 1
         if not changed:

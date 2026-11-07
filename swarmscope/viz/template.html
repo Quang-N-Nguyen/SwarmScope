@@ -93,13 +93,23 @@
     #t-read{min-width:0!important}
   }
 </style>
+<style>
+  .marker.ms{background:var(--ink);opacity:.55;width:2px}
+  .chip.ms .sw{background:var(--ink)}
+  .row.seg .btn{padding:5px 9px;font-size:12.5px}
+  #detail .grid{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;margin-top:4px}
+  #detail .grid div:nth-child(odd){color:var(--muted)}
+  .legend-item .ln{width:18px;height:0;border-top:2px solid var(--muted)}
+  .legend-item .ln.dash{border-top-style:dashed}
+  .kpi-s{font:12px var(--f-data);color:var(--muted);margin-top:2px}
+</style>
 <div id="app">
   <header>
     <h1>SwarmScope</h1>
     <span class="stat">source <b id="s-src">—</b></span>
     <span class="stat">events <b id="s-ev">—</b></span>
     <span class="stat">named agents <b id="s-ag">—</b></span>
-    <span class="stat">axis <b id="s-axis">—</b></span>
+    <span class="stat">named <b id="s-named">—</b> · dated <b id="s-dated">—</b></span>
     <span class="stat" style="margin-left:auto"><b id="s-vis">—</b> visible</span>
   </header>
 
@@ -110,11 +120,25 @@
       <div class="kpi-l" id="kpi-lead-l"></div>
       <div class="kpi" id="kpi-alert" style="font-size:15px">—</div>
       <div class="kpi-l" id="kpi-alert-l"></div>
+      <div class="kpi-s" id="kpi-acc"></div>
+    </div>
+
+    <div class="sec">
+      <h2>Time axis</h2>
+      <div class="row seg">
+        <button class="btn" id="ax-clock">Real clock</button>
+        <button class="btn" id="ax-disc">Discovery order</button>
+      </div>
+      <div class="row seg" id="range-row" style="margin-top:6px">
+        <button class="btn on" id="rg-week">Incident week</button>
+        <button class="btn" id="rg-all">All dates</button>
+      </div>
+      <div class="hint" id="axis-hint"></div>
     </div>
 
     <div class="sec">
       <h2>View</h2>
-      <div class="row">
+      <div class="row seg">
         <button class="btn on" id="mode-activity">Activity</button>
         <button class="btn" id="mode-coord">Coordination</button>
       </div>
@@ -122,32 +146,33 @@
     </div>
 
     <div class="sec">
-      <h2>Reveal over time</h2>
-      <div class="row">
+      <h2>Reveal</h2>
+      <div class="row seg">
         <button class="btn on" id="t-cumulative">Cumulative</button>
         <button class="btn" id="t-window">Sliding window</button>
       </div>
-      <div class="hint">Cumulative shows everything up to the cursor. Sliding window shows only recent activity, so you can watch bursts pass through.</div>
+      <div class="hint">Cumulative shows everything up to the cursor. Sliding window shows only recent activity, so you can watch bursts pass.</div>
     </div>
 
     <div class="sec" id="filters">
-      <h2>Edge types</h2>
-      <label class="chk"><input type="checkbox" id="k-use" checked data-kind="use"> use — agent touched a resource</label>
-      <label class="chk"><input type="checkbox" id="k-deliver" checked data-kind="deliver"> deliver — resource routed to an agent</label>
-      <label class="chk"><input type="checkbox" id="k-coord" checked data-kind="coordinate"> coordinate — agents shared a resource</label>
+      <h2>Edges</h2>
+      <label class="chk"><input type="checkbox" id="k-use" checked data-kind="use"> agent used a resource</label>
+      <label class="chk"><input type="checkbox" id="k-deliver" checked data-kind="deliver"> resource routed to an agent</label>
+      <label class="chk"><input type="checkbox" id="k-coord" checked data-kind="coordinate"> agents shared a resource</label>
+      <label class="chk"><input type="checkbox" id="k-inf" checked> include inferred authors (dashed)</label>
     </div>
 
     <div class="sec" id="tie-sec" hidden>
       <h2>Minimum tie strength</h2>
       <input type="range" id="tie" min="0" max="100" value="0">
       <div class="tiny" id="tie-read"></div>
-      <div class="hint">Tie strength is the Adamic–Adar score: a resource everyone uses adds little, a resource only two agents share adds a lot. Raise it to hide ties made only through common infrastructure and keep the telling ones.</div>
+      <div class="hint">Tie strength is the Adamic–Adar score: a resource everyone uses adds little, a resource only two agents share adds a lot. Raise it to keep only the telling ties.</div>
     </div>
 
     <div class="sec">
       <h2>Highlight mechanism</h2>
       <select id="mech"><option value="">— none —</option></select>
-      <div class="hint">Agents that used the chosen covert mechanism glow; the rest dim.</div>
+      <div class="hint">Agents that used the chosen mechanism get a ring; the rest dim.</div>
     </div>
 
     <div class="sec">
@@ -172,10 +197,10 @@
       <div id="chips"></div>
     </div>
     <div class="ctrls">
-      <button class="btn play" id="play">▶</button>
-      <input type="range" id="scrub" min="0" max="1000" value="0">
-      <span class="tiny" id="t-read" style="min-width:150px;text-align:right"></span>
-      <select id="speed" style="width:auto">
+      <button class="btn play" id="play" aria-label="Play">▶</button>
+      <input type="range" id="scrub" min="0" max="1000" value="1000" aria-label="Time">
+      <span class="tiny" id="t-read" style="min-width:170px;text-align:right"></span>
+      <select id="speed" style="width:auto" aria-label="Speed">
         <option value="1">1×</option><option value="2" selected>2×</option><option value="4">4×</option><option value="8">8×</option>
       </select>
     </div>
@@ -188,171 +213,152 @@
 const DATA = /*__DATA__*/;
 (function(){
 "use strict";
-const META = DATA.meta, MAX = META.maxpos || 1;
-// Colours come from the CSS tokens, so the canvas follows the light/dark theme.
+const META = DATA.meta, CLOCK = DATA.clock || {}, MAXPOS = META.maxpos || 1;
+
+// ---------- theme tokens -> canvas colours
 let TYPE_COLORS = {}, TIE_RGB = '14,138,129', EDGE_USE = 'rgba(86,102,100,.3)', EDGE_DELIVER = 'rgba(201,138,6,.4)';
+function getVar(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim()||'#888';}
 function readTheme(){
   TYPE_COLORS = {agent:getVar('--agent'),dest:getVar('--dest'),destination:getVar('--dest'),
     credential:getVar('--cred'),repo:getVar('--repo'),webhook:getVar('--webhook'),
     mailbox:getVar('--mailbox'),resource:getVar('--resource')};
   TIE_RGB = getVar('--tie'); EDGE_USE = getVar('--edge-use'); EDGE_DELIVER = getVar('--edge-deliver');
 }
-const COMM_COLORS = d3.schemeTableau10.concat(d3.schemeSet3);
-function getVar(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim()||'#888';}
 readTheme();
+const COMM_COLORS = d3.schemeTableau10.concat(d3.schemeSet3);
 const REDUCED = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const esc = s => String(s==null?'':s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const fmtTime = ts => { const d=new Date(ts*1000); return d.toISOString().slice(0,16).replace('T',' ')+' UTC'; };
+const pct = x => x==null ? '—' : (x*100).toFixed(1)+'%';
 
-// ---- header
+// ---------- header
 document.getElementById('s-src').textContent = META.source;
 document.getElementById('s-ev').textContent = META.n_events.toLocaleString();
 document.getElementById('s-ag').textContent = META.n_agents.toLocaleString();
-document.getElementById('s-axis').textContent = META.axis;
-document.getElementById('axis-note').textContent = ({
-  time: 'Axis = real timestamps from the log.',
-  estimated: 'Axis = estimated order: events sorted by when the resources they reference first appeared. Most records carry no timestamp, so this is a rough proxy for time, not a clock. Orange bars = share of events in that slice that are board / mailbox writes.',
-  sequence: 'Axis = raw log order (no timestamps available).'
-})[META.axis] || '';
+document.getElementById('s-named').textContent = pct(META.named_total_frac);
+document.getElementById('s-dated').textContent = pct(META.dated_total_frac);
 
-// ---- build node/link sets for the two modes
+// ---------- graph data
 const nodeById = new Map();
-DATA.nodes.forEach(n=>{ n.vx=0; n.vy=0; nodeById.set(n.id, n); });
-
-// activity links reference ids that must exist as nodes; keep only valid
+DATA.nodes.forEach(n=>{ nodeById.set(n.id, n); });
 const actLinks = DATA.links.filter(l=>nodeById.has(l.s)&&nodeById.has(l.t))
-  .map(l=>({source:l.s,target:l.t,k:l.k,p0:l.p0,pn:l.pn,w:l.w}));
+  .map(l=>({source:l.s,target:l.t,k:l.k,p0:l.p0,pn:l.pn,t0:l.t0,tn:l.tn,w:l.w,inf:l.inf}));
 const projLinks = DATA.proj_links.filter(l=>nodeById.has(l.s)&&nodeById.has(l.t))
-  .map(l=>({source:l.s,target:l.t,k:'coordinate',p0:l.p0,pn:l.p0,w:l.w}));
-
+  .map(l=>({source:l.s,target:l.t,k:'coordinate',p0:l.p0,pn:l.p0,t0:l.t0,tn:l.t0,w:l.w,inf:false}));
 const agentNodes = DATA.nodes.filter(n=>n.ty==='agent');
 
-let mode='activity';               // 'activity' | 'coordination'
-let timeMode='cumulative';         // 'cumulative' | 'window'
-const WINDOW = Math.max(50, Math.round(MAX*0.08));
-let t = MAX;                       // start fully revealed
-let playing=false, speed=2;
-const kindOn = {use:true,deliver:true,coordinate:true};
-let mech='';
+// ---------- state
+const HAS_CLOCK = !!(CLOCK.n_timed && CLOCK.window);
+let axis = HAS_CLOCK ? 'clock' : 'discovery';
+let range = 'week';
+let mode = 'activity', timeMode = 'cumulative', mech = '', showInf = true;
+const kindOn = {use:true, deliver:true, coordinate:true};
+let lo = 0, hi = MAXPOS, t = MAXPOS, W = 1;
+let playing = false, speed = 2;
 
-// ---- legend
-(function(){
-  const el=document.getElementById('legend');
-  const items=[['agent','agent','dot'],['dest','dead-drop / dataset','sq'],['credential','credential (secret)','sq'],
-    ['repo','repository','sq'],['mailbox','mailbox','sq'],['webhook','webhook','sq']];
-  items.forEach(([ty,label,shape])=>{
-    const d=document.createElement('div'); d.className='legend-item';
-    const m=document.createElement('span'); m.className=shape; m.style.background=TYPE_COLORS[ty]||getVar('--resource');
-    d.appendChild(m); d.appendChild(document.createTextNode(label)); el.appendChild(d);
-  });
-})();
-
-// ---- mechanism dropdown from covert inventory
-(function(){
-  const sel=document.getElementById('mech');
-  (DATA.covert||[]).forEach(r=>{
-    const o=document.createElement('option'); o.value=r.mechanism;
-    o.textContent=`${r.mechanism} (${r.n_events.toLocaleString()})`; sel.appendChild(o);
-  });
-  sel.addEventListener('change',e=>{mech=e.target.value; draw();});
-})();
-
-// ---- canvas + simulation
-const canvas=document.getElementById('cv'), ctx=canvas.getContext('2d');
-let W=0,H=0,DPR=Math.min(2,window.devicePixelRatio||1);
-function resize(){
-  const r=canvas.parentElement.getBoundingClientRect();
-  W=r.width;H=r.height;
-  canvas.width=W*DPR;canvas.height=H*DPR;ctx.setTransform(DPR,0,0,DPR,0,0);
-  if(sim){sim.force('center',d3.forceCenter(W/2,H/2)); sim.alpha(0.3).restart();}
-  draw();
-}
-window.addEventListener('resize',resize);
-
-let transform=d3.zoomIdentity;
-d3.select(canvas).call(d3.zoom().scaleExtent([0.2,6]).on('zoom',ev=>{transform=ev.transform;draw();}));
-
-// Log-scaled and capped, so a resource with 14,000 events does not swallow the view.
-function sizeOf(n){
-  if(mode==='coordination' && n.ty!=='agent') return 0;
-  const base = n.ty==='agent' ? 3 : 4;
-  return Math.min(n.ty==='agent'?11:16, base + 1.6*Math.log2(1+n.c));
+function setAxisBounds(){
+  if(axis==='clock'){
+    if(range==='week'){ lo = CLOCK.window[0]; hi = CLOCK.window[1]; W = 6*3600; }
+    else { lo = CLOCK.tmin; hi = CLOCK.tmax; W = Math.max(6*3600, (hi-lo)*0.02); }
+  } else { lo = 0; hi = MAXPOS; W = Math.max(50, Math.round(MAXPOS*0.08)); }
 }
 
-let sim;
-function activeNodes(){ return mode==='coordination' ? agentNodes : DATA.nodes; }
-function activeLinks(){ return mode==='coordination' ? projLinks : actLinks; }
-
-function startSim(){
-  const nodes=activeNodes(), links=activeLinks();
-  sim=d3.forceSimulation(nodes)
-    .force('charge',d3.forceManyBody().strength(mode==='coordination'?-60:-45).distanceMax(380))
-    .force('link',d3.forceLink(links).id(d=>d.id).distance(l=>l.k==='coordinate'?70:46).strength(l=>Math.min(.7,0.08+0.02*(l.w||1))))
-    .force('center',d3.forceCenter(W/2,H/2))
-    .force('collide',d3.forceCollide().radius(n=>sizeOf(n)+2))
-    .force('x',d3.forceX(W/2).strength(0.03)).force('y',d3.forceY(H/2).strength(0.03));
-  if(REDUCED){
-    // No animated settling: compute the layout up front, then draw once.
-    sim.stop(); for(let i=0;i<300;i++) sim.tick(); draw();
-  } else {
-    sim.on('tick',draw); sim.alpha(0.9).restart();
-  }
+// ---------- visibility
+function span(o){ return axis==='clock' ? [o.t0, o.tn] : [o.p0, o.pn]; }
+function visibleSpan(o){
+  const [a,b] = span(o);
+  if(a==null) return false;
+  if(timeMode==='cumulative') return a <= t;
+  return (b==null?a:b) >= t-W && a <= t;
 }
-
-// ---- visibility by time
-function nodeVisible(n){
+// Agents show from their own first activity. Resources show only once a
+// visible edge reaches them (a dataset touched once in May by an unnamed
+// event would otherwise sit alone on the canvas for weeks).
+let linkedNow = new Set();
+function baseVisible(n){
   if(mode==='coordination' && n.ty!=='agent') return false;
-  if(timeMode==='cumulative') return n.p0<=t;
-  return n.pn>=t-WINDOW && n.p0<=t;     // window overlap
+  if(n.ty==='agent' && !showInf && !(n.obs>0)) return false;
+  return visibleSpan(n);
+}
+function nodeVisible(n){
+  if(!baseVisible(n)) return false;
+  return n.ty==='agent' || linkedNow.has(n.id);
 }
 let tieMin = 0;
 const TIE_MAX = projLinks.reduce((m,l)=>Math.max(m,l.w||0), 0) || 1;
 function linkVisible(l){
   if(!kindOn[l.k]) return false;
+  if(l.inf && !showInf) return false;
   if(l.k==='coordinate' && (l.w||0) < tieMin) return false;
-  if(timeMode==='cumulative'){ if(l.p0>t) return false; }
-  else { if(!(l.pn>=t-WINDOW && l.p0<=t)) return false; }
-  return nodeVisible(typeof l.source==='object'?l.source:nodeById.get(l.source)) &&
-         nodeVisible(typeof l.target==='object'?l.target:nodeById.get(l.target));
+  if(!visibleSpan(l)) return false;
+  return typeof l.source==='object' && baseVisible(l.source) && baseVisible(l.target);
 }
 
+// ---------- canvas, layout
+const canvas=document.getElementById('cv'), ctx=canvas.getContext('2d');
+let Wc=0,Hc=0; const DPR=Math.min(2,window.devicePixelRatio||1);
+let transform=d3.zoomIdentity, sim=null, selected=null;
+function resize(){
+  const r=canvas.parentElement.getBoundingClientRect(); Wc=r.width; Hc=r.height;
+  canvas.width=Wc*DPR; canvas.height=Hc*DPR; ctx.setTransform(DPR,0,0,DPR,0,0);
+  if(sim){ sim.force('center',d3.forceCenter(Wc/2,Hc/2)); if(!REDUCED) sim.alpha(0.3).restart(); }
+  draw(); drawStrip();
+}
+d3.select(canvas).call(d3.zoom().scaleExtent([0.2,6]).on('zoom',ev=>{transform=ev.transform;draw();}));
+function sizeOf(n){
+  if(mode==='coordination' && n.ty!=='agent') return 0;
+  const base = n.ty==='agent' ? 3 : 4;
+  return Math.min(n.ty==='agent'?11:16, base + 1.6*Math.log2(1+n.c));
+}
+function activeNodes(){ return mode==='coordination' ? agentNodes : DATA.nodes; }
+function activeLinks(){ return mode==='coordination' ? projLinks : actLinks; }
+function startSim(){
+  // resolve link ends to node objects once (the simulation does this too)
+  activeLinks().forEach(l=>{ if(typeof l.source==='string') l.source=nodeById.get(l.source); if(typeof l.target==='string') l.target=nodeById.get(l.target); });
+  if(sim) sim.stop();
+  sim=d3.forceSimulation(activeNodes())
+    .force('charge',d3.forceManyBody().strength(mode==='coordination'?-60:-45).distanceMax(380))
+    .force('link',d3.forceLink(activeLinks()).id(d=>d.id).distance(l=>l.k==='coordinate'?70:46).strength(l=>Math.min(.7,0.08+0.02*(l.w||1))))
+    .force('center',d3.forceCenter(Wc/2,Hc/2))
+    .force('collide',d3.forceCollide().radius(n=>sizeOf(n)+2))
+    .force('x',d3.forceX(Wc/2).strength(0.03)).force('y',d3.forceY(Hc/2).strength(0.03));
+  if(REDUCED){ sim.stop(); for(let i=0;i<300;i++) sim.tick(); draw(); }
+  else { sim.on('tick',draw); sim.alpha(0.9).restart(); }
+}
 function nodeColor(n){
-  if(mode==='coordination'){ return n.comm>=0 ? COMM_COLORS[n.comm%COMM_COLORS.length] : getVar('--resource'); }
+  if(mode==='coordination') return n.comm>=0 ? COMM_COLORS[n.comm%COMM_COLORS.length] : getVar('--resource');
   return TYPE_COLORS[n.ty]||getVar('--resource');
 }
-function mechDim(n){ return mech && n.ty==='agent' && !(n.mech||[]).includes(mech); }
-function mechGlow(n){ return mech && n.ty==='agent' && (n.mech||[]).includes(mech); }
+const mechDim = n => mech && n.ty==='agent' && !(n.mech||[]).includes(mech);
+const mechGlow = n => mech && n.ty==='agent' && (n.mech||[]).includes(mech);
 
 function draw(){
-  ctx.save(); ctx.clearRect(0,0,W,H);
+  ctx.save(); ctx.clearRect(0,0,Wc,Hc);
   ctx.translate(transform.x,transform.y); ctx.scale(transform.k,transform.k);
-  const links=activeLinks(), nodes=activeNodes();
-  // edges
-  ctx.lineWidth=0.7/transform.k; let visE=0, visN=0;
-  for(const l of links){
-    if(!linkVisible(l)) continue; visE++;
-    const s=l.source,tg=l.target;
+  let visE=0, visN=0;
+  const vis = activeLinks().filter(linkVisible);
+  linkedNow = new Set();
+  vis.forEach(l=>{ linkedNow.add(l.source.id); linkedNow.add(l.target.id); });
+  for(const l of vis){
+    visE++;
+    const s=l.source, g=l.target; if(s.x==null||g.x==null) continue;
     if(l.k==='coordinate'){
-      // stronger (rarer) ties are thicker and more opaque
-      const s01 = Math.min(1,(l.w||0)/TIE_MAX);
-      ctx.strokeStyle = `rgba(${TIE_RGB},${0.12+0.6*s01})`;
-      ctx.lineWidth = (0.5+2.5*s01)/transform.k;
+      const s01=Math.min(1,(l.w||0)/TIE_MAX);
+      ctx.strokeStyle=`rgba(${TIE_RGB},${0.12+0.6*s01})`; ctx.lineWidth=(0.5+2.5*s01)/transform.k;
     } else {
-      ctx.strokeStyle = l.k==='deliver' ? EDGE_DELIVER : EDGE_USE;
-      ctx.lineWidth = 0.7/transform.k;
+      ctx.strokeStyle = l.k==='deliver' ? EDGE_DELIVER : EDGE_USE; ctx.lineWidth=0.8/transform.k;
     }
-    ctx.globalAlpha = mech ? 0.25 : 1;
-    ctx.beginPath(); ctx.moveTo(s.x,s.y); ctx.lineTo(tg.x,tg.y); ctx.stroke();
+    ctx.setLineDash(l.inf ? [3/transform.k, 3/transform.k] : []);
+    ctx.globalAlpha = (mech ? 0.25 : 1) * (l.inf ? 0.75 : 1);
+    ctx.beginPath(); ctx.moveTo(s.x,s.y); ctx.lineTo(g.x,g.y); ctx.stroke();
   }
-  ctx.globalAlpha=1;
-  // nodes
-  for(const n of nodes){
+  ctx.setLineDash([]); ctx.globalAlpha=1;
+  for(const n of activeNodes()){
     if(!nodeVisible(n)) continue; visN++;
-    const r=sizeOf(n); if(r<=0) continue;
+    const r=sizeOf(n); if(r<=0||n.x==null) continue;
     ctx.beginPath();
-    if(n.ty==='agent'){ ctx.arc(n.x,n.y,r,0,6.283); }
-    else { ctx.rect(n.x-r,n.y-r,2*r,2*r); }
-    ctx.fillStyle=nodeColor(n);
-    ctx.globalAlpha = mechDim(n)?0.12:1;
-    ctx.fill();
+    if(n.ty==='agent') ctx.arc(n.x,n.y,r,0,6.283); else ctx.rect(n.x-r,n.y-r,2*r,2*r);
+    ctx.fillStyle=nodeColor(n); ctx.globalAlpha = mechDim(n)?0.12:1; ctx.fill();
     if(mechGlow(n)){ ctx.lineWidth=2/transform.k; ctx.strokeStyle=getVar('--ink'); ctx.stroke(); }
     if(n===selected){ ctx.lineWidth=2.5/transform.k; ctx.strokeStyle=getVar('--accent'); ctx.stroke(); }
     ctx.globalAlpha=1;
@@ -361,155 +367,196 @@ function draw(){
   document.getElementById('s-vis').textContent=`${visN} nodes · ${visE} edges`;
 }
 
-// ---- picking (screen -> graph)
+// ---------- picking + detail
 function pick(mx,my){
   const x=(mx-transform.x)/transform.k, y=(my-transform.y)/transform.k;
   let best=null,bd=1e9;
   for(const n of activeNodes()){
-    if(!nodeVisible(n)) continue;
+    if(!nodeVisible(n)||n.x==null) continue;
     const r=sizeOf(n)+3, dx=n.x-x, dy=n.y-y, d=dx*dx+dy*dy;
     if(d<r*r && d<bd){bd=d;best=n;}
   }
   return best;
 }
-let selected=null;
 const tip=document.getElementById('tooltip');
 canvas.addEventListener('mousemove',e=>{
   const rect=canvas.getBoundingClientRect(), n=pick(e.clientX-rect.left,e.clientY-rect.top);
   if(n){ tip.style.opacity=1; tip.style.left=(e.clientX-rect.left+12)+'px'; tip.style.top=(e.clientY-rect.top+12)+'px';
-    tip.innerHTML=`<b>${esc(n.lab)}</b><br><span class="tiny">${n.ty} · ${n.c.toLocaleString()} events</span>`;
-    canvas.style.cursor='pointer';
-  } else { tip.style.opacity=0; canvas.style.cursor='default'; }
+    tip.innerHTML=`<b>${esc(n.lab)}</b><br><span class="tiny">${esc(n.ty)} · ${n.c.toLocaleString()} events</span>`;
+    canvas.style.cursor='pointer'; }
+  else { tip.style.opacity=0; canvas.style.cursor='default'; }
 });
 canvas.addEventListener('mouseleave',()=>tip.style.opacity=0);
 canvas.addEventListener('click',e=>{
-  const rect=canvas.getBoundingClientRect(), n=pick(e.clientX-rect.left,e.clientY-rect.top);
-  selected=n; renderDetail(n); draw();
+  const rect=canvas.getBoundingClientRect(); selected=pick(e.clientX-rect.left,e.clientY-rect.top);
+  renderDetail(selected); draw();
 });
 function renderDetail(n){
   const el=document.getElementById('detail');
-  if(!n){el.innerHTML='<span class="tiny">Click a node to inspect it.</span>';return;}
-  let h=`<div class="big">${esc(n.lab)}</div>`;
-  h+=`<div><span class="k">type</span> ${n.ty}</div>`;
-  h+=`<div><span class="k">events</span> ${n.c.toLocaleString()}</div>`;
-  h+=`<div><span class="k">first→last pos</span> ${n.p0} → ${n.pn}</div>`;
-  if(n.comm>=0) h+=`<div><span class="k">community</span> ${n.comm}</div>`;
-  if((n.mech||[]).length) h+=`<div style="margin-top:6px"><span class="k">mechanisms</span><br>${n.mech.map(m=>`<span class="pill">${esc(m)}</span>`).join('')}</div>`;
+  if(!n){ el.innerHTML='<span class="tiny">Click a node to inspect it.</span>'; return; }
+  const rows=[['type',n.ty],['events',n.c.toLocaleString()]];
+  if(n.ty==='agent') rows.push(['signed / inferred', `${n.obs||0} / ${n.inf||0}`]);
+  if(n.t0!=null) rows.push(['first seen', fmtTime(n.t0)]);
+  if(n.tn!=null && n.tn!==n.t0) rows.push(['last seen', fmtTime(n.tn)]);
+  if(n.t0==null) rows.push(['time','no date (visible in discovery order only)']);
+  if(n.role) rows.push(['main tactic', n.role]);
+  if(n.spec!=null) rows.push(['specialisation', n.spec]);
+  if(n.led) rows.push(['led / followed', `${n.led} / ${n.fol||0}`]);
+  if(n.betw) rows.push(['betweenness', n.betw]);
+  if(n.comm>=0 && n.ty==='agent') rows.push(['community', n.comm]);
+  let h=`<div class="big">${esc(n.lab)}</div><div class="grid">`+rows.map(([k,v])=>`<div>${esc(k)}</div><div>${esc(v)}</div>`).join('')+'</div>';
+  if((n.tac||[]).length) h+=`<div style="margin-top:6px"><span class="k">tactics</span><br>${n.tac.map(m=>`<span class="pill">${esc(m)}</span>`).join('')}</div>`;
+  if((n.mech||[]).length) h+=`<div style="margin-top:6px"><span class="k">top mechanisms</span><br>${n.mech.map(m=>`<span class="pill">${esc(m)}</span>`).join('')}</div>`;
   el.innerHTML=h;
 }
-function esc(s){return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
 
-// ---- timeline: density strip, signal markers, and clickable chips
-function shortSig(s){return ({shared_deaddrop:'shared resource',shared_deaddrop_nontask:'shared non-task resource',
-  private_channel:'private channel',credential_reuse:'credential reuse',board:'board / mailbox',
-  duplicate_control:'duplicate control',signed_cmd:'signed command'})[s]||s;}
-function drawDensity(){
-  const c=document.getElementById('dens'); if(!DATA.density) return;
-  const r=c.getBoundingClientRect(); const d=Math.min(2,window.devicePixelRatio||1);
-  c.width=r.width*d; c.height=r.height*d; const g=c.getContext('2d'); g.setTransform(d,0,0,d,0,0);
-  const draw1=(arr,color,scaleTo)=>{
-    const mx=Math.max(1,...arr), bw=r.width/arr.length;
-    g.fillStyle=color;
-    arr.forEach((v,i)=>{ const h=(Math.sqrt(v)/Math.sqrt(mx))*r.height*scaleTo; g.fillRect(i*bw,r.height-h,Math.max(1,bw-0.5),h); });
-  };
-  g.clearRect(0,0,r.width,r.height);
-  // Bins hold equal numbers of events, so only the *share* of board / mailbox
-  // writes per bin carries information. Draw that.
-  const share = DATA.density.coord.map((v,i)=> v/Math.max(1,DATA.density.all[i]));
-  draw1(share,getVar('--mailbox'),0.95);
-}
+// ---------- legend + mechanism list
 (function(){
-  const tl=document.getElementById('timeline'), chips=document.getElementById('chips');
-  const ms=(DATA.markers||[]).slice().sort((a,b)=>a.pos-b.pos);
-  ms.forEach(m=>{
-    const d=document.createElement('div'); d.className='marker'; d.style.left=(m.frac*100)+'%';
-    d.title=`${shortSig(m.sig)}: first fires at ${(m.frac*100).toFixed(2)}% of the stream`;
-    d.addEventListener('click',()=>setT(m.pos)); tl.appendChild(d);
-    const ch=document.createElement('span'); ch.className='chip';
-    ch.innerHTML=`<span class="sw" style="background:var(--accent2)"></span>${shortSig(m.sig)} · ${(m.frac*100).toFixed(2)}%`;
-    ch.title='Jump to the first time this signal fires';
-    ch.addEventListener('click',()=>setT(m.pos)); chips.appendChild(ch);
-  });
-  if(DATA.alert){
-    const a=document.createElement('div'); a.className='marker alert'; a.style.left=(DATA.alert.frac*100)+'%';
-    a.title=`Combined multi-agent alert at ${(DATA.alert.frac*100).toFixed(2)}%`;
-    a.addEventListener('click',()=>setT(DATA.alert.pos)); tl.appendChild(a);
-    const ch=document.createElement('span'); ch.className='chip';
-    ch.innerHTML=`<span class="sw" style="background:var(--alert)"></span><b>first alert</b> · ${(DATA.alert.frac*100).toFixed(2)}%`;
-    ch.addEventListener('click',()=>setT(DATA.alert.pos)); chips.appendChild(ch);
-  }
+  const el=document.getElementById('legend');
+  const add=(html)=>{ const d=document.createElement('div'); d.className='legend-item'; d.innerHTML=html; el.appendChild(d); };
+  [['agent','agent','dot'],['dest','dataset / dead-drop','sq'],['credential','credential','sq'],['repo','repository','sq'],['mailbox','mailbox','sq'],['webhook','webhook','sq']]
+    .forEach(([ty,label,shape])=>add(`<span class="${shape}" style="background:${TYPE_COLORS[ty]||getVar('--resource')}"></span>${label}`));
+  add('<span class="ln"></span>observed author');
+  add('<span class="ln dash"></span>inferred author');
+  const sel=document.getElementById('mech');
+  (DATA.covert||[]).forEach(r=>{ const o=document.createElement('option'); o.value=r.mechanism; o.textContent=`${r.mechanism} (${r.n_events.toLocaleString()})`; sel.appendChild(o); });
+  sel.addEventListener('change',e=>{mech=e.target.value; draw();});
 })();
 
-// ---- headline (real-clock early warning)
+// ---------- headline
 (function(){
   const h=DATA.headline||{}; if(!h.first_alert_when) return;
   document.getElementById('headline').hidden=false;
   const lp=h.lead_private||{}, lb=h.lead_board||{};
   if(lp.hf_worker_rce!=null){
     document.getElementById('kpi-lead').textContent=`${lp.hf_worker_rce} h`;
-    document.getElementById('kpi-lead-l').textContent=
-      `warning before the Hugging Face worker RCE, from the structure-only "private channel" signal (${lp.hf_credentials_found} h before credentials were found).`;
+    document.getElementById('kpi-lead-l').textContent=`warning before the RCE on the Hugging Face worker, from the structure-only "private channel" signal (${lp.hf_credentials_found} h before the credentials were found).`;
   }
   document.getElementById('kpi-alert').textContent=h.first_alert_when;
-  document.getElementById('kpi-alert-l').textContent=
-    `first multi-agent alert, replaying only the ${(h.n_timed||0).toLocaleString()} dated events. `+
-    (lb.public_discovery!=null?`That is ~${Math.round(lb.public_discovery/24)} days before public discovery.`:'');
+  document.getElementById('kpi-alert-l').textContent=`first multi-agent alert, strict replay of ${(h.n_timed||0).toLocaleString()} dated events`+(lb.public_discovery!=null?`, about ${Math.round(lb.public_discovery/24)} days before public discovery.`:'.');
+  document.getElementById('kpi-acc').textContent=`inferred names: ${h.attr_precision!=null?(h.attr_precision*100).toFixed(0)+'% precise':'—'} · inferred dates: ${h.date_within_24h!=null?(h.date_within_24h*100).toFixed(0)+'% within 24 h':'—'} (held-out tests)`;
 })();
 
-// ---- controls
-const scrub=document.getElementById('scrub'), tread=document.getElementById('t-read'), prog=document.getElementById('progress');
-function setT(v){ t=Math.max(0,Math.min(MAX,v)); scrub.value=Math.round(t/MAX*1000);
-  const f=(t/MAX*100).toFixed(1);
-  tread.textContent = META.axis==='time' ? `pos ${Math.round(t)} · ${f}%` : `pos ${Math.round(t)} / ${MAX} · ${f}%`;
-  prog.style.width=f+'%'; draw();
+// ---------- timeline strip, markers, chips
+const SIG_NAME={shared_deaddrop:'shared resource',shared_deaddrop_nontask:'shared non-task resource',private_channel:'private channel',
+  credential_reuse:'credential reuse',board:'board / mailbox',duplicate_control:'duplicate control',signed_cmd:'signed command'};
+const tl=document.getElementById('timeline'), chips=document.getElementById('chips');
+const frac = v => (v-lo)/((hi-lo)||1);
+function drawStrip(){
+  const c=document.getElementById('dens'); const r=c.getBoundingClientRect(); if(!r.width) return;
+  c.width=r.width*DPR; c.height=r.height*DPR; const g=c.getContext('2d'); g.setTransform(DPR,0,0,DPR,0,0);
+  g.clearRect(0,0,r.width,r.height);
+  if(axis==='clock'){
+    const hr=DATA.hourly; if(!hr||!hr.obs.length) return;
+    const nb=Math.max(40,Math.min(240,Math.floor(r.width/4))), bo=new Array(nb).fill(0), bi=new Array(nb).fill(0);
+    for(let k=0;k<hr.obs.length;k++){
+      const ts=(hr.start_hour+k)*3600; if(ts<lo||ts>hi) continue;
+      const b=Math.min(nb-1,Math.floor(frac(ts)*nb)); bo[b]+=hr.obs[k]; bi[b]+=hr.inf[k];
+    }
+    const mx=Math.max(1,...bo.map((v,i)=>v+bi[i])), bw=r.width/nb;
+    for(let i=0;i<nb;i++){
+      const ho=Math.sqrt(bo[i]/mx)*r.height*0.95, ht=Math.sqrt((bo[i]+bi[i])/mx)*r.height*0.95;
+      g.fillStyle=`rgba(${TIE_RGB},.30)`; g.fillRect(i*bw,r.height-ht,Math.max(1,bw-0.5),ht);
+      g.fillStyle=`rgba(${TIE_RGB},.85)`; g.fillRect(i*bw,r.height-ho,Math.max(1,bw-0.5),ho);
+    }
+  } else {
+    const d=DATA.density; if(!d) return;
+    const share=d.coord.map((v,i)=>v/Math.max(1,d.all[i])), mx=Math.max(1e-9,...share), bw=r.width/share.length;
+    g.fillStyle=getVar('--mailbox');
+    share.forEach((v,i)=>{ const h=Math.sqrt(v/mx)*r.height*0.95; g.fillRect(i*bw,r.height-h,Math.max(1,bw-0.5),h); });
+  }
 }
-scrub.addEventListener('input',()=>setT(scrub.value/1000*MAX));
-document.getElementById('speed').addEventListener('change',e=>speed=+e.target.value);
-const playBtn=document.getElementById('play');
-playBtn.addEventListener('click',()=>{ playing=!playing; playBtn.textContent=playing?'❚❚':'▶';
-  if(playing && t>=MAX) setT(0); if(playing) requestAnimationFrame(loop); });
-let last=0;
-function loop(ts){
-  if(!playing) return;
-  if(!last) last=ts; const dt=ts-last; last=ts;
-  setT(t + MAX*(dt/8000)*speed);
-  if(t>=MAX){ playing=false; playBtn.textContent='▶'; last=0; return; }
-  requestAnimationFrame(loop);
+function addChip(html,cls,onClick,title){
+  const ch=document.createElement('button'); ch.type='button'; ch.className='chip '+(cls||''); ch.innerHTML=html; if(title) ch.title=title;
+  ch.addEventListener('click',onClick); chips.appendChild(ch);
+}
+function buildMarkers(){
+  tl.querySelectorAll('.marker').forEach(m=>m.remove()); chips.innerHTML='';
+  const mk=(v,cls,title,go)=>{ const f=frac(v); if(f<0||f>1) return; const d=document.createElement('div'); d.className='marker '+(cls||''); d.style.left=(f*100)+'%'; d.title=title; d.addEventListener('click',go); tl.appendChild(d); };
+  if(axis==='clock'){
+    (DATA.milestones||[]).forEach(m=>{
+      const inR = m.ts>=lo && m.ts<=hi;
+      mk(m.ts,'ms',`${m.label}: ${fmtTime(m.ts)}`,()=>setT(m.ts));
+      addChip(`<span class="sw"></span>${esc(m.label)}${inR?'':' (outside range)'}`,'ms',()=>{ if(!inR){ range='all'; applyRange(); } setT(m.ts); },fmtTime(m.ts));
+    });
+    (DATA.clock_signals||[]).slice().sort((a,b)=>a.ts-b.ts).forEach(s=>{
+      const inR = s.ts>=lo && s.ts<=hi;
+      // A time of exactly 00:00 or 12:00 is often a date written as a time.
+      const dayish = s.prec==='day' || s.ts%86400===0;
+      const when = dayish ? fmtTime(s.ts).slice(5,10)+' (date only?)' : fmtTime(s.ts).slice(5,16);
+      mk(s.ts,'',`${SIG_NAME[s.sig]||s.sig}: first fires ${fmtTime(s.ts)}${dayish?' (may be a date with no time of day)':''}`,()=>setT(s.ts));
+      addChip(`<span class="sw" style="background:var(--accent2)"></span>${esc(SIG_NAME[s.sig]||s.sig)} · ${when}${inR?'':' ↔'}`,'',()=>{ if(!inR){ range='all'; applyRange(); } setT(s.ts); },'First firing in the strict replay');
+    });
+  } else {
+    (DATA.markers||[]).slice().sort((a,b)=>a.pos-b.pos).forEach(m=>{
+      mk(m.pos,'',`${SIG_NAME[m.sig]||m.sig}: discovery position ${(m.frac*100).toFixed(2)}%`,()=>setT(m.pos));
+      addChip(`<span class="sw" style="background:var(--accent2)"></span>${esc(SIG_NAME[m.sig]||m.sig)} · ${(m.frac*100).toFixed(2)}%`,'',()=>setT(m.pos),'Discovery order (not a clock)');
+    });
+  }
 }
 
+// ---------- controls
+const scrub=document.getElementById('scrub'), tread=document.getElementById('t-read'), prog=document.getElementById('progress');
+function setT(v){
+  t=Math.max(lo,Math.min(hi,v)); const f=frac(t);
+  scrub.value=Math.round(f*1000); prog.style.width=(f*100)+'%';
+  tread.textContent = axis==='clock' ? fmtTime(t) : `position ${Math.round(t).toLocaleString()} / ${MAXPOS.toLocaleString()}`;
+  draw();
+}
+scrub.addEventListener('input',()=>setT(lo+scrub.value/1000*(hi-lo)));
+document.getElementById('speed').addEventListener('change',e=>speed=+e.target.value);
+const playBtn=document.getElementById('play'); let last=0;
+playBtn.addEventListener('click',()=>{ playing=!playing; playBtn.textContent=playing?'❚❚':'▶'; playBtn.setAttribute('aria-label',playing?'Pause':'Play');
+  if(playing && t>=hi) setT(lo); if(playing){ last=0; requestAnimationFrame(loop);} });
+function loop(ts){
+  if(!playing) return; if(!last) last=ts; const dt=ts-last; last=ts;
+  setT(t+(hi-lo)*(dt/12000)*speed);
+  if(t>=hi){ playing=false; playBtn.textContent='▶'; return; }
+  requestAnimationFrame(loop);
+}
+function seg(onId, offIds){ document.getElementById(onId).classList.add('on'); offIds.forEach(i=>document.getElementById(i).classList.remove('on')); }
+function applyRange(){ setAxisBounds(); seg(range==='week'?'rg-week':'rg-all', [range==='week'?'rg-all':'rg-week']); buildMarkers(); drawStrip(); setT(hi); }
+function applyAxis(){
+  seg(axis==='clock'?'ax-clock':'ax-disc',[axis==='clock'?'ax-disc':'ax-clock']);
+  document.getElementById('range-row').hidden = axis!=='clock';
+  document.getElementById('axis-hint').textContent = axis==='clock'
+    ? `Real time. Only events with a date are shown: dates read from the data plus inferred dates (${pct(META.dated_total_frac)} of events).`
+    : 'Every event, in the order the reconstruction found its resources. This is not a clock: a held-out test showed it predicts time worse than guessing the median day.';
+  document.getElementById('axis-note').textContent = axis==='clock'
+    ? 'Bars: dated events per time slice (dark = date read from the data, light = inferred). Dark lines: incident milestones (METR / Swarm Traces). Amber: first firing of each signal in the strict replay.'
+    : 'Bars: share of events in each slice that are board / mailbox writes. Amber: first firing of each signal in this order.';
+  applyRange();
+}
+document.getElementById('ax-clock').addEventListener('click',()=>{ if(!HAS_CLOCK) return; axis='clock'; applyAxis(); });
+document.getElementById('ax-disc').addEventListener('click',()=>{ axis='discovery'; applyAxis(); });
+document.getElementById('rg-week').addEventListener('click',()=>{ range='week'; applyRange(); });
+document.getElementById('rg-all').addEventListener('click',()=>{ range='all'; applyRange(); });
+if(!HAS_CLOCK) document.getElementById('ax-clock').disabled=true;
 function setMode(m){
-  mode=m;
-  document.getElementById('mode-activity').classList.toggle('on',m==='activity');
-  document.getElementById('mode-coord').classList.toggle('on',m==='coordination');
+  mode=m; seg(m==='activity'?'mode-activity':'mode-coord',[m==='activity'?'mode-coord':'mode-activity']);
   document.getElementById('mode-hint').textContent = m==='activity'
-    ? 'Agents (circles) and the dead-drops / datasets / credentials they touch (squares). Edge = an agent used that resource.'
-    : 'Agent-to-agent only. Two agents are linked when they shared a resource; thicker = rarer shared resource. Colour = community.';
+    ? 'Agents (circles) and the datasets, credentials and mailboxes they used (squares). Dashed edge = the author was inferred.'
+    : 'Agent to agent. Two agents are linked when they used the same resource; thicker = rarer resource. Colour = community. Signed authors only.';
   document.getElementById('tie-sec').hidden = m!=='coordination';
   startSim(); draw();
 }
 document.getElementById('mode-activity').addEventListener('click',()=>setMode('activity'));
 document.getElementById('mode-coord').addEventListener('click',()=>setMode('coordination'));
-document.getElementById('t-cumulative').addEventListener('click',()=>{timeMode='cumulative';
-  document.getElementById('t-cumulative').classList.add('on');document.getElementById('t-window').classList.remove('on');draw();});
-document.getElementById('t-window').addEventListener('click',()=>{timeMode='window';
-  document.getElementById('t-window').classList.add('on');document.getElementById('t-cumulative').classList.remove('on');draw();});
-document.querySelectorAll('#filters input').forEach(c=>c.addEventListener('change',e=>{kindOn[e.target.dataset.kind]=e.target.checked;draw();}));
-
-// ---- tie-strength slider
+document.getElementById('t-cumulative').addEventListener('click',()=>{timeMode='cumulative'; seg('t-cumulative',['t-window']); draw();});
+document.getElementById('t-window').addEventListener('click',()=>{timeMode='window'; seg('t-window',['t-cumulative']); draw();});
+document.querySelectorAll('#filters input[data-kind]').forEach(c=>c.addEventListener('change',e=>{kindOn[e.target.dataset.kind]=e.target.checked; draw();}));
+document.getElementById('k-inf').addEventListener('change',e=>{showInf=e.target.checked; draw();});
 (function(){
   const s=document.getElementById('tie'), r=document.getElementById('tie-read');
-  const upd=()=>{ tieMin = (s.value/100)*TIE_MAX;
-    const kept = projLinks.filter(l=>(l.w||0)>=tieMin).length;
-    r.textContent = `≥ ${tieMin.toFixed(2)} · ${kept.toLocaleString()} of ${projLinks.length.toLocaleString()} ties`; draw(); };
+  const upd=()=>{ tieMin=(s.value/100)*TIE_MAX; const kept=projLinks.filter(l=>(l.w||0)>=tieMin).length;
+    r.textContent=`≥ ${tieMin.toFixed(2)} · ${kept.toLocaleString()} of ${projLinks.length.toLocaleString()} ties`; draw(); };
   s.addEventListener('input',upd); upd();
 })();
 
-// ---- go
-resize(); startSim(); setMode('activity'); setT(MAX); drawDensity();
-// Re-read colours when the theme changes (OS setting or the viewer's toggle).
-if(window.matchMedia) window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{readTheme();draw();drawDensity();});
-new MutationObserver(()=>{readTheme();draw();drawDensity();}).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
-window.addEventListener('resize',drawDensity);
-setTimeout(()=>{ if(sim) sim.alpha(0.2).restart(); }, 400);
+// ---------- go
+window.addEventListener('resize',resize);
+resize(); setMode('activity'); applyAxis();
+if(window.matchMedia) window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{readTheme();draw();drawStrip();});
+new MutationObserver(()=>{readTheme();draw();drawStrip();}).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
 })();
 </script>

@@ -106,8 +106,36 @@ def test_rates():
     assert r["top_pair"] >= 0.9, r
 
 
+def test_validated_ties_null_model():
+    """Power and false-tie check for ``research.validated_ties``.
+
+    30 agents each use 4 of 200 resources at random, and everyone uses one hub.
+    Agents A03 and A17 also share ``n`` private resources. Measured over 20
+    seeds (Nov 2026): n = 3..5 -> found 0/20, n = 6 -> 4/20, n = 8 -> 20/20,
+    with zero false ties in every run. The test is cautious: it needs strong
+    evidence before it calls a tie real.
+    """
+    from swarmscope.detectors import research
+    found = false_ties = 0
+    for seed in range(20):
+        rng = random.Random(seed)
+        evs, k = [], 0
+        for a in [f"A{i:02d}" for i in range(30)]:
+            for r in rng.sample(range(200), 4) + ["HUB"]:
+                evs.append(_ev(k, a, f"destination:{r}", {"destination": [str(r)]}, {})); k += 1
+        for j in range(8):
+            for a in ("A03", "A17"):
+                evs.append(_ev(k, a, f"destination:P{j}", {"destination": [f"P{j}"]}, {})); k += 1
+        pairs = {(t["a"], t["b"]) for t in research.validated_ties(EventLog(evs, name="syn"))["ties"]}
+        found += ("A03", "A17") in pairs
+        false_ties += len(pairs - {("A03", "A17")})
+    assert found >= 18, found
+    assert false_ties == 0, false_ties
+
+
 if __name__ == "__main__":
     test_planted_pair_ranks_first(); print("ok  planted pair ranks first (seed 0)")
     r = evaluate(100)
     print("synthetic evaluation over 100 seeds:", r)
     test_rates(); print("ok  rates within bounds")
+    test_validated_ties_null_model(); print("ok  validated ties: planted pair found, random overlap rejected")

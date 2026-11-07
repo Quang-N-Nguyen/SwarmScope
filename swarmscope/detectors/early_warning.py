@@ -1,13 +1,19 @@
 """Early-warning replay: could the tool have flagged the swarm early?
 
-We replay the events in order and, at each step, use *only* information seen so
-far (an online detector). We record the first moment each signal fires, then ask
-the forensic question: if we had raised an alert at first detection, how much of
-the swarm's recorded activity was still ahead of us?
+We replay the events in time order and, at each step, use *only* information
+seen so far (an online detector). We record the first moment each signal fires
+and compare it with known milestones of the incident.
 
-Because Swarm Traces has almost no real timestamps, "early" is measured as a
-fraction of the reconstructed event stream, not wall-clock time. We also report a
-timestamp-only cross-check over the ~1-2% of events that carry a real date.
+Two real-clock replays:
+
+* **strict**   -- only events whose date was read from the data, and only
+  agents who signed their work. Nothing inferred.
+* **extended** -- also events with an inferred date and an inferred author
+  (see ``swarmscope.infer``). More data, more risk of error.
+
+The ``replay`` on the discovery order is kept for the viewer's markers only.
+A held-out test showed that order is not a clock, so it is never used to
+claim that something was "early".
 
 Signals (all online, all cheap):
 
@@ -131,20 +137,23 @@ def replay(log: EventLog, prefer_time: bool = True) -> dict:
     )
 
 
-def timestamp_crosscheck(log: EventLog) -> dict:
-    """Repeat the replay using only events with a real embedded timestamp.
+def timestamp_crosscheck(log: EventLog, include_inferred: bool = False) -> dict:
+    """Replay on the real clock (see module docstring: strict vs extended).
 
-    This is a sanity check: do the signals fire early in real time too, not just
-    early in the reconstruction order?
+    Strict (``include_inferred=False``): events with a date read from the
+    data (``ts_source == "embedded"``) and signed authors only.
+    Extended: also chain-inherited and inferred dates, and inferred authors.
     """
     import dataclasses
-    timed = [e for e in log.events if e.ts is not None and e.ts_source == "embedded"]
+    ok = ("embedded", "chain", "inferred") if include_inferred else ("embedded",)
+    timed = [e for e in log.events if e.ts is not None and e.ts_source in ok]
     if len(timed) < 20:
         return dict(n_timed=len(timed), note="too few timestamped events for a time-based check")
-    # Copy the timestamped events with order_hint cleared so the sub-log sorts
-    # on the real clock, not the estimated order. Copying avoids mutating the
-    # main log's events.
-    copies = [dataclasses.replace(e, order_hint=None, seq=i)
+    # Copy the events (never mutate the main log): clear the discovery key so
+    # the sub-log sorts on the real clock, and in extended mode use the
+    # inferred author where there is no observed one.
+    copies = [dataclasses.replace(e, order_hint=None, seq=i,
+                                  actor=(e.who(True) if include_inferred else e.actor))
               for i, e in enumerate(sorted(timed, key=lambda e: e.ts))]
     sub = EventLog(copies, name="timed")
     r = replay(sub, prefer_time=True)
@@ -154,9 +163,13 @@ def timestamp_crosscheck(log: EventLog) -> dict:
         if not ts:
             return None
         return _dt.datetime.fromtimestamp(ts, _dt.timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-    out = dict(n_timed=len(timed), axis="time", signals={})
+    out = dict(n_timed=len(timed), axis="time", include_inferred=include_inferred, signals={})
+    by_id = {e.event_id: e for e in copies}
     for s, v in r["per_signal_first_fire"].items():
-        out["signals"][s] = dict(frac=v["frac"], when=_fmt(v["ts"]), ts=v["ts"])
+        ev = by_id.get(v["event_id"])
+        out["signals"][s] = dict(frac=v["frac"], when=_fmt(v["ts"]), ts=v["ts"],
+                                 precision=(ev.ts_precision if ev else None),
+                                 event_id=v["event_id"])
 
     # Lead time: hours between the first multi-agent alert and each milestone.
     alert_ts = None
@@ -194,4 +207,5 @@ def timestamp_crosscheck(log: EventLog) -> dict:
 
 def run_all(log: EventLog, prefer_time: bool = True) -> dict:
     return dict(replay=replay(log, prefer_time),
-                timestamp_crosscheck=timestamp_crosscheck(log))
+                timestamp_crosscheck=timestamp_crosscheck(log, include_inferred=False),
+                extended=timestamp_crosscheck(log, include_inferred=True))
