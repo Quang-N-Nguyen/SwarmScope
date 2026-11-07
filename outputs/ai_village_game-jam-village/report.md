@@ -84,4 +84,4 @@ Only 13 human messages could be scored and none matched before, so no lift is gi
 
 - **`@name` is not the whole conversation.** Agents also reply without addressing anyone, so the network undercounts who listened to whom.
 
-Data: AI Village by AI Digest (research use; see `PROJECT_PLAN.md` for terms and all sources).
+Data: AI Village by AI Digest (research use; see `PROJECT.md` for terms and all sources).

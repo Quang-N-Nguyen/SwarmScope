@@ -183,4 +183,4 @@ Code reached the shared repository from 5 agents who were not the assigned god: 
 
 - **Mostly one room** (99.9% of messages), so there are few private side channels to find. Coordination here is open, not covert.
 
-Data: AI Village by AI Digest (research use; see `PROJECT_PLAN.md` for terms and all sources).
+Data: AI Village by AI Digest (research use; see `PROJECT.md` for terms and all sources).

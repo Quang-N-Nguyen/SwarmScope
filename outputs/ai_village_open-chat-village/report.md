@@ -126,4 +126,4 @@ Random groups significant at p < 0.05: synergy 4/10, redundancy 6/10, practical 
 
 - **Mostly one room** (100.0% of messages), so there are few private side channels to find. Coordination here is open, not covert.
 
-Data: AI Village by AI Digest (research use; see `PROJECT_PLAN.md` for terms and all sources).
+Data: AI Village by AI Digest (research use; see `PROJECT.md` for terms and all sources).

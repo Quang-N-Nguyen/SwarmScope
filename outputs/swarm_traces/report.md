@@ -267,4 +267,4 @@ Roles (each agent's main tactic, leaving out the board-token flag that every nam
 
 - **What would fix this at the source.** Deployers should log a stable agent ID and a timestamp on every outbound request, as proposed for agent infrastructure by Chan et al. (2025). Investigators with access to the unredacted data (header names, JWT and gzip times, which the Swarm Traces authors used) could re-run this tool with far less inference.
 
-Full method notes and all sources: `PROJECT_PLAN.md`.
+Full method notes and all sources: `PROJECT.md`.

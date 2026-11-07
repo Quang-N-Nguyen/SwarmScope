@@ -1,84 +1,65 @@
-# Apart-Research-Swarm-2026 — SwarmScope
+# SwarmScope
 
-Code for the Apart Research Swarm Alignment Hackathon project (Track 4: Multi-Agent Oversight and Control).
+Dynamic-graph forensics and early warning for multi-agent logs. Apart Research Swarm Alignment Hackathon, Track 4 (Multi-Agent Oversight and Control).
 
-**SwarmScope** reads multi-agent logs. It reconstructs **who talked to whom**, **how information spread**, and **which covert channels were used**. Then it renders a **dynamic graph** that you can play forward in time.
+SwarmScope reads a multi-agent log and rebuilds who talked to whom, how information spread and which covert channels were used. It plays the result forward as a dynamic graph and replays the log online to test whether the coordination could have been flagged early. When names and times are redacted, it infers them and reports its error on held-out data.
 
-When names and times are missing (as in the redacted Swarm Traces data), SwarmScope **infers** them from shared rare identifiers, and it reports how often each guess is wrong on held-out data. Inferred names are 95% precise, and 94% of inferred dates fall within 24 h. Inferred values are always shown apart from observed ones.
-
-- Plan, design, results, and all sources: [`PROJECT_PLAN.md`](PROJECT_PLAN.md)
-- Findings on Swarm Traces: [`outputs/swarm_traces/report.md`](outputs/swarm_traces/report.md)
-- Findings on AI Village `swarm-village`: [`outputs/ai_village_swarm-village/report.md`](outputs/ai_village_swarm-village/report.md)
-- The other AI Village villages (control logs): `outputs/ai_village_<village>/report.md`, compared in [`outputs/ai_village_comparison.md`](outputs/ai_village_comparison.md)
-- One combined alert across all logs (lead time vs false alarms): [`outputs/flag_early.md`](outputs/flag_early.md)
-- Real external log through the generic loader (Transluce agent-activity reports): [`outputs/transluce/report.md`](outputs/transluce/report.md)
-- Independent review of the headline claims, and blind-labelled precision/recall: [`review/`](review/)
-- Interactive viewers: open `outputs/*/swarmscope_*.html` in a browser. They work offline. Use **Follow an item** to watch a file, commit, coined term or role claim spread from agent to agent.
-
-When most events already name their author (AI Village), SwarmScope skips inference and adds detectors for the conversation network by phase, information diffusion, online change points, authority mismatch (an agent claiming a role it was not given), role drift (agents' own goals vs their assigned roles) and rule breaks in their shell commands. It also checks side rooms (private groups, items leaking into the main room), human influence (did viewers' messages and links change what agents said and did), goal adoption after a village goal changes, and Riedl's information-theoretic emergence test. On `swarm-village` it catches an unassigned agent claiming the "god" role (73 agents followed it), and, from the agents' memories, an operator error that silently reassigned every role (alert 12 minutes after it; the chat never mentioned it). See `PROJECT_PLAN.md` §11 (findings) and §7 (terms and sources). In the viewer, the **Forensics charts** button shows these results on one clock: change-detector scores, role talk around the reshuffle, the agents' own goals drifting after it, who the swarm treated as god, and how files, commits and coined terms spread.
+- **Paper and results:** [`PROJECT.md`](PROJECT.md)
+- **Viewers:** open `outputs/*/swarmscope_*.html` in a browser (works offline)
+- **Reports:** `outputs/*/report.md`; across villages: [`outputs/ai_village_comparison.md`](outputs/ai_village_comparison.md); combined alert: [`outputs/flag_early.md`](outputs/flag_early.md)
 
 ## Quick start
 
 ```bash
-# 1. Analyze Swarm Traces (Python 3.9+, standard library only, about 1 minute)
+# Swarm Traces (Python 3.9+, standard library only, about 1 minute)
 python -m swarmscope.cli analyze Swarm-Traces-Data/redacted.jsonl.gz \
     --format swarm_traces --out outputs/swarm_traces --inference balanced
-#    --inference: off | precise | balanced | broad (accuracy table in PROJECT_PLAN.md §8.2)
+#   --inference: off | precise | balanced | broad
+python scripts/sweep_inference.py Swarm-Traces-Data/redacted.jsonl.gz   # accuracy per preset
 
-# 2. Get AI Village (gated: accept the terms on huggingface.co first)
-pip install huggingface_hub
-huggingface-cli login
-python scripts/download_ai_village.py            # swarm-village core tables, about 100 MB
-#    add memories and computer-use turns (needed for role drift, goal adoption and rule breaks):
-python scripts/download_ai_village.py --tables chat_messages,chat_rooms,agents,events,computer_use_sessions,village_goals,agent_goals,villages,agent_memories,computer_use_turns
-python -m swarmscope.cli analyze data/ai-village/swarm-village \
-    --format ai_village --out outputs/ai_village_swarm-village
-
-# 3. Your own log (any JSONL; say which fields hold what)
-python -m swarmscope.cli analyze my_log.jsonl --format generic \
-    --map actor=from,channel=thread,text=body,ts=time --out outputs/mine
-
-# 4. Everything for AI Village (all four villages), then the cross-log scores
+# AI Village (gated: accept the terms on huggingface.co, then log in)
+pip install huggingface_hub && huggingface-cli login
+python scripts/download_ai_village.py --village swarm-village \
+    --tables chat_messages,chat_rooms,agents,events,computer_use_sessions,village_goals,agent_goals,villages,agent_memories,computer_use_turns
 for v in swarm-village game-jam-village open-chat-village main-village; do
   python -m swarmscope.cli analyze data/ai-village/$v --format ai_village --out outputs/ai_village_$v
 done
 python scripts/compare_villages.py      # one table across villages
-python scripts/flag_early.py            # one combined alert: lead time vs false alarms
+python scripts/flag_early.py            # combined alert: lead time vs false alarms
 
-# 5. Transluce (download the zip from transluce.org/agent-activity and unzip it into data/transluce)
+# Transluce (unzip the release from transluce.org/agent-activity into data/transluce)
 python scripts/transluce_to_jsonl.py data/transluce/urlquery-agent-activity-2026-09-22-v5 data/transluce/reports.jsonl
 python -m swarmscope.cli analyze data/transluce/reports.jsonl --format generic \
     --map actor=source,channel=evidence_class,text=text,ts=time,kind=confidence,id=id --out outputs/transluce
 
+# Any JSONL log
+python -m swarmscope.cli analyze my_log.jsonl --format generic \
+    --map actor=from,channel=thread,text=body,ts=time --out outputs/mine
+
 # Tests
-python tests/test_synthetic.py
-python tests/test_loaders.py
-python tests/test_detectors.py
+python tests/test_synthetic.py && python tests/test_loaders.py && python tests/test_detectors.py
 ```
 
 ## Layout
 
 ```
 swarmscope/
-  events.py            canonical Event model; one ordering per log
-  extract.py           text -> resource ids, agent handles, mechanism flags
-  graph.py             activity graph + agent graph (Adamic–Adar ties)
-  loaders/             swarm_traces, ai_village, generic
-  infer/               links (evidence graph), attribution, dating, aliases
-  detectors/           coordination, info_spread, covert, early_warning, research
-                       + for named-speaker logs: conversation, diffusion, changepoint, authority, actions,
-                         rooms, influence, emergence
-  viz/                 template.html + inlined D3 -> one self-contained HTML file
+  events.py, extract.py, graph.py   event model, text -> resources and flags, activity and agent graphs
+  loaders/                          swarm_traces, ai_village, generic
+  infer/                            evidence links, attribution, dating, aliases
+  detectors/                        coordination, info_spread, covert, early_warning, research,
+                                    conversation, diffusion, changepoint, authority, actions,
+                                    rooms, influence, emergence
+  viz/                              template.html + inlined D3 -> one offline HTML viewer
   report.py, cli.py
-scripts/               download_ai_village, sweep_inference, compare_villages, flag_early, transluce_to_jsonl
-tests/                 planted-collusion and tie-test checks, loader tests, one test per detector
-review/                independent review, blind-label scores
-outputs/<log>/         report.md + viewer HTML per log (findings.json is regenerated, not committed)
-outputs/*.md           cross-village table, combined alert
+scripts/                            download, sweep_inference, compare_villages, flag_early, transluce_to_jsonl
+tests/                              synthetic, loader and detector tests
+docs/figures/                       figures used in PROJECT.md
+outputs/<log>/                      report.md + viewer HTML (findings.json is regenerated, not committed)
 ```
 
-## Notes on the data
+## Data
 
-- **Swarm Traces** (swarmtraces.org): preliminary and redacted. Agent IDs are masked, and only 3.1% of records carry a trusted date. The tool **never prints payload text**. Reports show only IDs, counts and flags.
-- **AI Village** (huggingface.co/datasets/aidigestorg/ai-village): released under the `ai-village-research-terms`. Use it for research only. Do not re-identify people, and cite AI Digest / AI Village. The data is not committed to this repo. Humans appear only as anonymous ids; reports show link domains, never message text from viewers.
-- **Transluce** (transluce.org/agent-activity): public report links and metadata, no agent field. It tests the generic loader; who-talked-to-whom cannot be rebuilt from it.
+- **Swarm Traces** ([swarmtraces.org](https://swarmtraces.org/)): redacted by its authors. The tool never prints payload text.
+- **AI Village** ([dataset](https://huggingface.co/datasets/aidigestorg/ai-village)): research use only under `ai-village-research-terms`; no re-identification; cite AI Digest. Not committed.
+- **Transluce** ([agent activity](https://transluce.org/agent-activity)): public report metadata; no agent field.

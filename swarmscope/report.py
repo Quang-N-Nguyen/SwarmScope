@@ -539,9 +539,9 @@ def _markdown_attributed(log: EventLog, f: dict) -> str:
                    "channels to find. Coordination here is open, not covert.")
     L.append("\n\n".join(f"- {p}" for p in pts))
     if s.get("source") == "ai_village" or getattr(log, "village", None):
-        L.append("\nData: AI Village by AI Digest (research use; see `PROJECT_PLAN.md` for terms and all sources).")
+        L.append("\nData: AI Village by AI Digest (research use; see `PROJECT.md` for terms and all sources).")
     else:
-        L.append("\nSee `PROJECT_PLAN.md` for all data sources.")
+        L.append("\nSee `PROJECT.md` for all data sources.")
     return "\n".join(x for x in L if x is not None)
 
 
@@ -794,7 +794,7 @@ def to_markdown(log: EventLog, f: dict) -> str:
     # ---- 7. blind spots
     L.append("## 7. What an investigator would still miss\n")
     L.append(_blind_spots(log, f))
-    L.append("\nFull method notes and all sources: `PROJECT_PLAN.md`.")
+    L.append("\nFull method notes and all sources: `PROJECT.md`.")
     return "\n".join(L)
 
 

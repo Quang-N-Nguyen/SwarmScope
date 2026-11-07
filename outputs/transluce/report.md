@@ -90,4 +90,4 @@ Random groups significant at p < 0.05: synergy 4/10, redundancy 5/10, practical 
 
 - **`@name` is not the whole conversation.** Agents also reply without addressing anyone, so the network undercounts who listened to whom.
 
-See `PROJECT_PLAN.md` for all data sources.
+See `PROJECT.md` for all data sources.
