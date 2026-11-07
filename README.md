@@ -28,7 +28,9 @@ python -m swarmscope.cli analyze Swarm-Traces-Data/redacted.jsonl.gz \
 # 2. Get AI Village (gated: accept the terms on huggingface.co first)
 pip install huggingface_hub
 huggingface-cli login
-python scripts/download_ai_village.py            # swarm-village, about 100 MB
+python scripts/download_ai_village.py            # swarm-village core tables, about 100 MB
+#    add memories and computer-use turns (needed for role drift, goal adoption and rule breaks):
+python scripts/download_ai_village.py --tables chat_messages,chat_rooms,agents,events,computer_use_sessions,village_goals,agent_goals,villages,agent_memories,computer_use_turns
 python -m swarmscope.cli analyze data/ai-village/swarm-village \
     --format ai_village --out outputs/ai_village_swarm-village
 
@@ -71,7 +73,8 @@ swarmscope/
 scripts/               download_ai_village, sweep_inference, compare_villages, flag_early, transluce_to_jsonl
 tests/                 planted-collusion and tie-test checks, loader tests, one test per detector
 review/                independent review, blind-label scores
-outputs/swarm_traces/, outputs/ai_village_swarm-village/   report.md, findings.json, viewer HTML
+outputs/<log>/         report.md + viewer HTML per log (findings.json is regenerated, not committed)
+outputs/*.md           cross-village table, combined alert
 ```
 
 ## Notes on the data

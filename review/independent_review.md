@@ -1,6 +1,6 @@
 # Independent review of SwarmScope headline claims
 
-I computed everything below from the raw tables with my own stdlib scripts (`/home/claude/review/*.py`, run with `python3 -I`). I did not read project outputs, project code or PROJECT_PLAN.md. Timestamps are naive UTC, with fractional seconds normalised to 6 digits. All joins use agent IDs.
+I computed everything below from the raw tables with my own short standard-library scripts (one-off checks, not kept in the repo). I did not read project outputs, project code or PROJECT_PLAN.md. Timestamps are naive UTC, with fractional seconds normalised to 6 digits. All joins use agent IDs.
 
 ## 1. swarm-village size and span
 **Method:** row counts and min/max `created_at`.

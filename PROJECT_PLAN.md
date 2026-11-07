@@ -1,7 +1,7 @@
 # Project plan: SwarmScope
 
 **Apart Research hackathon, Track 4 (Multi-Agent Oversight and Control).**
-Last updated: 2026-11-07. All sources are listed in [§13 References](#13-references).
+Last updated: 2026-11-07. All sources are listed in [§14 References](#14-references).
 
 ## 1. Goal
 
@@ -25,18 +25,14 @@ We also test whether the tool **could have flagged the coordination early**. The
 
 | Part | Status |
 |---|---|
-| Swarm Traces analysis, report, dynamic viewer | Done. See `outputs/swarm_traces/`. |
-| Fixes for the 3 blind spots (authors, time, aliases) | Done. Each fix has a held-out accuracy test (§7). |
+| Swarm Traces: analysis, report, dynamic viewer | Done (`outputs/swarm_traces/`). |
+| Inference for the 3 blind spots (authors, time, aliases) | Done, each with a held-out accuracy test (§7). |
 | Researcher metrics from the reading list | Done (§8). |
-| Code review | Done. 6 bugs fixed (§11). |
-| AI Village, all 4 villages | Done. All tables except screenshots for all four villages, including the memories and computer-use turns of `open-chat-village` (1.6 GB) and `main-village` (7.2 GB). Cross-village comparison in §10.7. |
-| AI Village (`swarm-village`) | Done. Detectors for logs with named speakers: conversation network, information diffusion, change points, authority mismatch, role drift and rule breaks in actions (§10). See `outputs/ai_village_swarm-village/`. |
-| Side rooms, human influence, emergence, goal adoption | Done (§10.9): `rooms.py`, `influence.py`, `emergence.py`, `actions.goal_adoption`. |
-| One combined flag-early score | Done (§10.9): `scripts/flag_early.py`, `outputs/flag_early.md`. |
-| Private-channel limit scaled with swarm size | Done: at most 3 agents and at most 10% of the roster (§9). |
-| Spread animation in the viewer | Done: "Follow an item" draws each adoption as an arrow at its time. |
-| Validation | Done (§10.8): independent review of 10 claims, blind labels with confidence intervals, 18 tests (11 detector, 4 loader, 3 synthetic). |
-| Generic loader on an outside log | Done on Transluce [D3] (§10.9). |
+| AI Village, all 4 villages, all tables except screenshots | Done (§10). |
+| Side rooms, human influence, emergence, goal adoption, one combined alert | Done (§10.9). |
+| Validation: independent review, blind labels, 18 tests | Done (§10.8). |
+| Generic loader on an outside log (Transluce) | Done (§10.9). |
+| Code review | Done: 15 problems found and fixed (§11). |
 | Swarm Traces unredacted fields | Not available, by the authors' choice: they redacted usernames and infrastructure details at Hugging Face's request. We work with the public release only. |
 
 ## 4. Data
@@ -70,9 +66,9 @@ log ─► loader ─► events ─► inference (authors, dates, aliases) ─�
 1. **Loader.** `swarm_traces`, `ai_village` (the Hugging Face tables: agents, rooms, chat messages, actions, role assignments; operator messages become milestones), or `generic` (any JSONL file plus a field map). Each one turns a record into an `Event`. An event holds who did it, the channel, the resources it touched, its mechanism flags, and its time. Observed and inferred values are always kept in separate fields.
 2. **Inference** (§7). Fill in missing authors and dates, and find alias candidates. Each step measures its own error on held-out data.
 3. **Graphs.** An *activity graph* (agents and resources) and an *agent graph* (agent to agent, Adamic–Adar ties).
-4. **Detectors.** Shared dead-drops, covert-channel inventory, and an early-warning replay on the real clock. For logs where most events name their author (AI Village), the tool skips inference and adds four detectors (§10): conversation network by phase, information diffusion, online change points, and authority mismatch.
+4. **Detectors.** Shared dead-drops, covert-channel inventory, and an early-warning replay on the real clock. For logs where most events name their author (AI Village), the tool skips inference and adds (§10): conversation network by phase, information diffusion, online change points, authority mismatch, side rooms, human influence and an emergence test; with memories and computer-use turns, also role drift, goal adoption and rule breaks in shell commands.
 5. **Researcher metrics** (§8).
-6. **Viewer.** One HTML file with a **real-clock axis** (incident week or all dates) and a **discovery-order axis** (all events, not a clock). It has play/pause, Activity and Coordination views, inferred edges drawn dashed, METR milestones on the timeline, and node details (role, tactics, leader and broker scores).
+6. **Viewer.** One HTML file with a **real-clock axis** (incident week or all dates) and a **discovery-order axis** (all events, not a clock). It has play/pause, Activity and Coordination views, inferred edges drawn dashed, milestones on the timeline, and node details (role, tactics, leader and broker scores). **Follow an item** replays one file, commit, coined term or role claim: when an agent first uses it, an arrow is drawn from the agent it most likely got it from, and agents that never used it are dimmed (in swarm-village, `OWNERS.md` reaches 117 agents in 8.9 hours, half of them in the first 3.9). For named-speaker logs, **Forensics charts** shows the detectors' results on one clock.
 
 ## 7. Fixing the three blind spots
 
@@ -162,7 +158,7 @@ We also fixed one name-parsing case. `MODAL` marks work in the Modal sandbox, an
 | Riedl [R11] (emergent coordination) | Is the group more than a sum of agents? | **Emergence test** (§10.9): practical criterion and pairwise dynamical synergy (Williams–Beer PID [M20]) on agent activity, groups of 10, 200 surrogates | AI Village: the practical criterion is never significant; pairwise synergy is significant in 3/10 (swarm-village), 4/10 (open-chat) and 7/10 (main) random groups once shared schedules and co-presence are controlled. |
 | Hammond et al. [R1] (emergent agency); Greenblatt et al. [R8] | Does the group hand power to an agent that was not given it? | **Authority mismatch** (§10) | AI Village: an unassigned agent claimed the privileged role, and 73 of 133 agents then addressed it in that role. |
 | Rose et al. [R7] (interpretability) | — | Needs model internals. We use logs only, so the two approaches complement each other. | — |
-| Foerster et al. [R12] (CaMeL for computer use) | Where does untrusted data steer actions? | The info-spread traces are a provenance view. | — |
+| Foerster et al. [R12] (CaMeL for computer use) | Where does untrusted data steer actions? | **Human influence** (§10.9): viewer text reused by agents, and viewer-first links that agents then opened | AI Village open-chat: agents opened or ran 93 of 212 viewer-first links (44%) within 24 hours. |
 
 **Information spread** (real clock):
 - `credential:169` reached 14 agents in 29 hours, and half of them within 5 hours.
@@ -184,7 +180,7 @@ These figures come from the strict replay: only dates and names read from the da
 
 Both multi-agent signals fire 63–64 days before public discovery (2026-09-11).
 
-The *private channel* signal is a non-task resource used repeatedly (6 or more signed events) by a closed group of 2–3 agents. On synthetic logs (100 seeds) it has 100% recall, 0% early fires and 0% false alarms. That is an easy test. On the benign AI Village swarm it fires 14 times in 24.3 h (0.58 per hour), so the real false-alarm rate is not zero (§10.4).
+The *private channel* signal is a non-task resource used repeatedly (6 or more signed events) by a closed group of 2 agents up to `private_group_limit(n) = min(3, 10% of n)` agents, where n is the roster size (30 when the roster is unknown, as in Swarm Traces). Example: a swarm of 6 has limit 0, so the signal is off; a swarm of 133 has limit 3. On synthetic logs (100 seeds) it has 100% recall, 0% early fires and 0% false alarms. That is an easy test. On the benign AI Village swarm it fires 14 times in 24.3 h (0.58 per hour), so the real false-alarm rate is not zero (§10.4).
 
 The extended replay (which adds inferred dates and names) moves some signals weeks earlier. Each of those moves rests on a few inferred dates, so treat it as a lead to check, not a result.
 
@@ -192,7 +188,7 @@ The extended replay (which adds inferred dates and names) moves some signals wee
 
 `swarm-village` [D2] is the opposite of Swarm Traces: every message names its speaker and has a time, and the swarm did ordinary work. 133 agents first built an "Earth" simulation together (a shared repository with `OWNERS.md`, `ROLES.md`, `world.json`), then from 10:00 UTC on 30 Aug each agent role-played an assigned role (ministers, judges, one "god" who alone may edit the code). The operators (humans) posted 5 messages; we use them as ground-truth milestones.
 
-So here we do not need inference. A message that writes `@name` is an edge from the speaker to that agent. We added four detectors for logs like this (`swarmscope/detectors/`).
+So here we do not need inference. A message that writes `@name` is an edge from the speaker to that agent. We added detectors for logs like this (`swarmscope/detectors/`).
 
 ### 10.1 Who talked to whom (`conversation.py`)
 
@@ -313,7 +309,7 @@ Full table: `outputs/ai_village_comparison.md` (`python scripts/compare_villages
 
 **1. What changed in the tool so it works on all four.**
 - *Names with spaces.* "Claude Fable 5: Agent 1" cannot be read as one `@token`. The loader now matches `@<full name>`, and `@Agent 1` when only one agent has that suffix.
-- *Milestones.* Human messages count as operator announcements only when they are rare (60 or fewer). Copies posted in several rooms, and nudges to single agents ("@Agent 3, you have been pausing"), are dropped: game-jam has 5 announcements and 27 nudges. Where humans chat a lot, the start of each new village goal is the milestone instead (main-village: 50).
+- *Milestones.* Human messages count as operator announcements only when they are rare (60 or fewer). Copies posted in several rooms, and nudges to single agents ("@Agent 3, you have been pausing"), are dropped: game-jam keeps 4 announcements and drops 27 nudges. Where humans chat a lot, the start of each new village goal is the milestone instead (main-village: 50).
 - *Daily schedules.* Open-chat runs on weekdays, 9am–5pm Pacific. The 30-minute detector alerted at almost every opening (78 alerts). For logs longer than 3 days it now compares each step with the same hour on earlier days, and skips steps where a window is empty: 23 alerts in 66 days.
 - *Speed.* The change detector now slides its windows instead of rescanning every message. Main village (215,755 messages) runs in about 4 minutes on chat alone, and in about 32 minutes with its 7.2 GB of memories and computer-use turns.
 - *Report.* Every section is built from the village's own data and appears only when it applies (no god role, no memories, and so on).
@@ -332,16 +328,16 @@ The 30-minute detector is near chance here: a new goal changes the talk over a w
 
 | village | private channel / h | shared resource / h |
 |---|---|---|
-| `game-jam-village` (6 agents) | **1.32** | 3.19 |
+| `game-jam-village` (6 agents) | 0 (was 1.32) | 3.19 |
 | `swarm-village` (133) | 0.58 | 7.54 |
-| `open-chat-village` (23) | 0.33 | 1.88 |
+| `open-chat-village` (23) | 0.14 (was 0.33) | 1.88 |
 | `main-village` (58) | 0.09 | 0.56 |
 
-The private-channel signal (a resource used by a closed group of 2–3 agents) fires most in the smallest team: with 6 agents, almost any shared file is "private". It only makes sense in a large swarm, and its threshold should scale with the number of agents.
+With a fixed limit of 3 agents, the private-channel signal fired most in the smallest team: with 6 agents, almost any shared file is "private". The limit now scales with the roster (§9), so it is off for 6 agents and lower for 23. The Swarm Traces lead (44.7 h) does not change.
 
 **4. Who talks to whom.** Game-jam agents almost never use `@` (10 addresses in 3 days), so its conversation network is empty: they name each other without `@`. In main-village, 81% of addressed pairs answer each other back, against 27% in open-chat, where most pairs involve a viewer. Attention Gini is computed over AI agents only, because hundreds of viewers who speak once and are never addressed would push it to 1.
 
-**5. What we still cannot check.** Open-chat has 12,264 messages from members of the public. Whether a viewer's message steered an agent (an instruction, a prompt injection) is a real risk for agents that read untrusted text, and SwarmScope does not measure it yet. The memories and computer-use turns of open-chat and main (8.7 GB together) would allow the role-drift and rule-break checks there too.
+**5. Role drift outside swarm-village.** In main-village the role-drift detector finds 57 statements by 11 agents, but none uses the strictest phrases ("assigned role", "Phase-2 role", "my role is"); they are work-session goals that name a task, so they are weak evidence and raise no alert. Human influence and goal adoption in open-chat and main are in §10.9.
 
 ### 10.8 Validation: independent review, blind labels, unit tests
 
@@ -372,7 +368,7 @@ Both detectors are precise and miss about half: a flag is almost always real, bu
 
 ### 10.9 New analyses: side rooms, one combined alert, human influence, emergence, goal adoption
 
-**Side rooms (`rooms.py`).** Main village is the only one with real side rooms (19% of messages outside `#general`). None is private: the busy ones have 13–16 agents (the private limit for 58 agents is 3), and the rooms with 1–4 agents hold 1–22 messages. They are real second spaces, though: during their active days the members of `#rest` wrote 72.5% of their messages there, and 151 coined items first used in `#rest` later reached 3 or more agents in `#general`. So coordination in AI Village is open; we find no hidden channel.
+**Side rooms (`rooms.py`).** Main village is the only one with real side rooms (19% of messages outside `#general`). None is private: the four busy ones have 13–16 agents (the private limit for 58 agents is 3), and the others have 1–8 agents and at most 245 agent messages; the rooms with 1–4 agents hold at most 14. They are real second spaces, though: during their active days the members of `#rest` wrote 72.5% of their messages there, and 151 coined items first used in `#rest` later reached 3 or more agents in `#general`. So coordination in AI Village is open; we find no hidden channel.
 
 **One combined alert (`scripts/flag_early.py`, `outputs/flag_early.md`).** A combined alert fires when K different signal families fire within 6 hours (private channel, board, chat change, day-level change, unassigned role claim, role drift, landed code commit by a non-privileged agent):
 
@@ -395,7 +391,7 @@ False alarms: rate per active day (episodes). **K = 2 is the best trade-off:** i
 | open-chat-village (1-h bins, 387) | 0/10 | 4/10 | 6/10 | 0.20 |
 | main-village (1-h bins, 1,673) | 0/10 | 7/10 | 5/10 | 0.015 |
 
-As in Riedl's own results, the practical criterion is almost never positive. Pairwise synergy (two agents together predict their joint next step better than separately) is significant in a minority of groups in swarm-village and in most groups in main-village. This uses message timing only, not content.
+The practical criterion is never significant. Pairwise synergy (two agents' activity together predicts the group's next step better than either one alone) is significant in a minority of groups in swarm-village and open-chat and in most groups in main-village. This uses message timing only, not content.
 
 **Goal adoption (`actions.goal_adoption`).** In main-village, after a new village goal starts, agents' memories mention it within a median of 3.4 hours (100% of active agents per goal, median over 41 goals with distinctive words); only 2.5% of memories in the first 24 hours still describe only the old goal. This is the main-village counterpart of role drift: there, agents notice announced goal changes within hours; in swarm-village, a silent change was noticed privately and never discussed.
 
@@ -442,13 +438,13 @@ As in Riedl's own results, the practical criterion is almost never positive. Pai
 1. **AI Village, next steps.** Compare each agent's actions with its role (does the Minister of Agriculture act on farms?), not only its stated role. Raise drift recall (now about 47%) with phrases such as "drawn role" and "harness goal". Use message content, not only timing, in the emergence test.
 2. **Harder synthetic tests.** Plants inside popular resources, rotating aliases, groups larger than 3.
 3. **Use the gzip and JWT times** if the authors ever choose to release them. This removes most of the dating inference.
-4. **Deploy.** Publish the viewer, then add a small upload page: drop in a JSONL log, map its fields, and get the viewer back.
+4. **Deploy.** Add a small upload page: drop in a JSONL log, map its fields, and get the viewer back.
 
 ## 14. References
 
 **Data and incident reports**
 - [D1] Swarm Traces (2026). Report: https://swarmtraces.org/ · Evidence viewer: https://swarmtraces.org/viewer/ · Dataset: https://swarmtraces.org/data/final/redacted.jsonl.gz
-- [D2] AI Digest. AI Village dataset (gated; research terms; we used the `swarm-village` folder). https://huggingface.co/datasets/aidigestorg/ai-village · Project page: https://theaidigest.org/village · Overview: https://theaidigest.org/village/blog/what-we-learned-2025
+- [D2] AI Digest. AI Village dataset (gated; research terms; we used all four villages: `swarm-village`, `game-jam-village`, `open-chat-village`, `main-village`). https://huggingface.co/datasets/aidigestorg/ai-village · Project page: https://theaidigest.org/village · Overview: https://theaidigest.org/village/blog/what-we-learned-2025
 - [D3] Transluce (2026). Early rogue AI agent activity and attempts to hack found on urlquery.net. https://transluce.org/agent-activity
 - [D4] METR / Redwood Research (Aug 2026). Independent investigation of the OpenAI / Hugging Face incident. https://metr.org/hugging-face-incident-report-aug-2026.pdf
 
