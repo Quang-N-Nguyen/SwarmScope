@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>[hidden]{display:none!important} body{margin:0} img{max-width:100%}</style>
+<title>SwarmScope</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one evidence column; each finding is a row of claim (left) and the view that proves it (right), stacking on phones. */
+:root{
+  --bg:#f3f6f5; --surface:#ffffff; --ink:#13201d; --muted:#566864; --line:#d3ddda;
+  --accent:#0f766e; --accent-soft:#d8efeb; --alert:#c2410c; --alert-soft:#fbe6da;
+  --display:"Bricolage Grotesque", "Helvetica Neue", Arial, sans-serif;
+  --body:"IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+  --mono:"IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#0e1513; --surface:#151f1d; --ink:#e2ebe8; --muted:#94a7a2; --line:#27342f;
+  --accent:#34d1bd; --accent-soft:#16332f; --alert:#fb923c; --alert-soft:#3a2416; color-scheme:dark } }
+:root[data-theme="dark"]{
+  --bg:#0e1513; --surface:#151f1d; --ink:#e2ebe8; --muted:#94a7a2; --line:#27342f;
+  --accent:#34d1bd; --accent-soft:#16332f; --alert:#fb923c; --alert-soft:#3a2416; color-scheme:dark }
+
+*{box-sizing:border-box}
+body{background:var(--bg); color:var(--ink); font:16px/1.55 var(--body);
+  padding-left:max(16px, env(safe-area-inset-left, 0px)); padding-right:max(16px, env(safe-area-inset-right, 0px)); padding-block:0 48px}
+.wrap{max-width:1100px; margin:0 auto; display:flex; flex-direction:column; gap:56px}
+a{color:var(--accent)}
+a:focus-visible, .btn:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+h1,h2,h3{font-family:var(--display); text-wrap:balance; margin:0; letter-spacing:-0.01em}
+p{margin:0}
+.mono{font-family:var(--mono); font-variant-numeric:tabular-nums}
+.label{font:500 12px/1.2 var(--mono); letter-spacing:.08em; text-transform:uppercase; color:var(--muted)}
+
+/* header */
+header{padding-top:40px; display:grid; gap:20px}
+.top{display:flex; justify-content:space-between; align-items:baseline; flex-wrap:wrap; gap:12px}
+.brand{font:700 22px/1 var(--display)}
+.links{display:flex; gap:16px; flex-wrap:wrap; font-size:14px}
+h1{font-size:clamp(30px, 4.6vw, 50px); line-height:1.08; max-width:20ch}
+.lede{font-size:18px; color:var(--muted); max-width:62ch}
+
+/* hero timeline */
+.hero{background:var(--surface); border:1px solid var(--line); border-radius:6px; padding:20px 20px 12px; display:grid; gap:10px}
+.hero-head{display:flex; justify-content:space-between; align-items:baseline; gap:12px; flex-wrap:wrap}
+.big{font:700 clamp(40px, 6vw, 64px)/1 var(--display); color:var(--alert)}
+.big small{font:500 16px var(--body); color:var(--muted); margin-left:8px}
+.tl{overflow-x:auto}
+.tl svg{display:block; width:100%; min-width:640px; height:auto}
+.tl text{font-family:var(--mono); font-size:11px; fill:var(--muted)}
+.tl .ev{font-family:var(--body); font-size:12.5px; fill:var(--ink)}
+.cap{font-size:13px; color:var(--muted)}
+
+/* findings */
+.findings{display:grid; gap:28px}
+.f{display:grid; grid-template-columns:minmax(0,5fr) minmax(0,7fr); gap:28px; padding-top:28px; border-top:1px solid var(--line)}
+.f:first-child{border-top:0; padding-top:0}
+.f-text{display:grid; gap:12px; align-content:start; min-width:0}
+.f-num{font:500 13px var(--mono); color:var(--accent)}
+.f h3{font-size:24px; line-height:1.2}
+.stat{display:flex; gap:20px; flex-wrap:wrap}
+.stat div{display:grid}
+.stat b{font:700 28px/1.1 var(--display); font-variant-numeric:tabular-nums}
+.stat span{font-size:13px; color:var(--muted)}
+.f-text p{color:var(--ink)}
+.btns{display:flex; gap:8px; flex-wrap:wrap; margin-top:4px}
+.btn{display:inline-flex; align-items:center; gap:6px; font:500 14px var(--body); text-decoration:none;
+  padding:8px 12px; border-radius:4px; border:1px solid var(--accent); color:var(--accent); background:transparent}
+.btn:hover{background:var(--accent-soft)}
+.btn.primary{background:var(--accent); color:var(--surface)}
+.btn.primary:hover{filter:brightness(1.08); background:var(--accent)}
+.f-fig{display:grid; gap:8px; min-width:0; align-content:start}
+.f-fig img{width:100%; border:1px solid var(--line); border-radius:4px; background:#fff; display:block}
+figure{margin:0; display:grid; gap:6px}
+figcaption{font-size:13px; color:var(--muted)}
+
+/* small charts and tables */
+.bars{background:var(--surface); border:1px solid var(--line); border-radius:4px; padding:16px; display:grid; gap:14px}
+.bar-row{display:grid; grid-template-columns:minmax(0,190px) minmax(0,1fr) 48px; gap:10px; align-items:center; font-size:14px}
+.track{height:14px; background:var(--bg); border-radius:2px; overflow:hidden}
+.fill{height:100%; background:var(--accent)}
+.fill.before{background:var(--muted); opacity:.55}
+.bar-row .v{font:500 13px var(--mono); text-align:right; font-variant-numeric:tabular-nums}
+.group-l{font:500 12px var(--mono); letter-spacing:.06em; text-transform:uppercase; color:var(--muted)}
+.tbl{overflow-x:auto; background:var(--surface); border:1px solid var(--line); border-radius:4px}
+table{border-collapse:collapse; width:100%; font-size:14px; font-variant-numeric:tabular-nums}
+th,td{padding:9px 12px; text-align:right; border-bottom:1px solid var(--line); white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+th{font:500 12px var(--mono); color:var(--muted); letter-spacing:.04em}
+tr.pick td{background:var(--accent-soft); font-weight:600}
+tr:last-child td{border-bottom:0}
+
+/* system */
+.sys{display:grid; gap:20px}
+.pipe{display:grid; grid-template-columns:repeat(5, minmax(0,1fr)); gap:10px}
+.step{background:var(--surface); border:1px solid var(--line); border-radius:4px; padding:14px; display:grid; gap:6px; align-content:start}
+.step b{font:600 15px var(--display)}
+.step span{font-size:13.5px; color:var(--muted)}
+.logs{display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:10px}
+.log{background:var(--surface); border:1px solid var(--line); border-radius:4px; padding:14px; display:grid; gap:6px; text-decoration:none; color:var(--ink)}
+.log:hover{border-color:var(--accent)}
+.log b{font:600 15px var(--display)}
+.log span{font-size:13px; color:var(--muted)}
+.log em{font:500 12px var(--mono); font-style:normal; color:var(--accent)}
+footer{font-size:13px; color:var(--muted); border-top:1px solid var(--line); padding-top:16px; display:grid; gap:6px}
+
+@media (max-width: 820px){
+  .f{grid-template-columns:minmax(0,1fr)}
+  .pipe{grid-template-columns:repeat(2, minmax(0,1fr))}
+  .logs{grid-template-columns:minmax(0,1fr)}
+}
+@media (max-width: 480px){ .pipe{grid-template-columns:minmax(0,1fr)} .bar-row{grid-template-columns:minmax(0,1fr) 44px} .bar-row .track{grid-column:1 / -1; grid-row:2} }
+@media (prefers-reduced-motion: no-preference){ .btn{transition:background .15s} }
+</style>
+</head>
+<body>
+
+
+<div class="wrap">
+<header>
+  <div class="top">
+    <span class="brand">SwarmScope</span>
+    <nav class="links" aria-label="Project links">
+      <a href="https://github.com/Quang-N-Nguyen/Apart-Research-Swarm-2026" target="_blank" rel="noopener">Code</a>
+      <a href="https://github.com/Quang-N-Nguyen/Apart-Research-Swarm-2026/blob/main/PROJECT.md" target="_blank" rel="noopener">Paper</a>
+      <a href="#viewers">Viewers</a>
+    </nav>
+  </div>
+  <h1>Who talked to whom in a swarm of AI agents, and could we have seen it coming?</h1>
+  <p class="lede">SwarmScope turns a multi-agent log into a dynamic interaction graph, infers redacted authors and times with measured error, and replays the log online to test early warning. Below are five results on real logs, each with the view that shows it.</p>
+</header>
+
+<section class="hero" aria-labelledby="hero-t">
+  <div class="hero-head">
+    <h2 id="hero-t" class="label">Swarm Traces · the swarm that attacked Hugging Face, July 2026</h2>
+    <div class="big">44.7 h<small>warning before the RCE</small></div>
+  </div>
+  <div class="tl">
+    <svg viewBox="0 0 900 150" role="img" aria-label="Timeline from 9 July 00:00 to 12 July 00:00 UTC. Board signal at 9 July 00:00, private-channel signal at 9 July 19:20, Hugging Face credentials found at 10 July 09:38, RCE on the Hugging Face worker at 11 July 16:02.">
+      <!-- scale: x = 40 + hours since 9 Jul 00:00 * (820/72) -->
+      <line x1="40" y1="96" x2="860" y2="96" stroke="var(--line)" stroke-width="2"/>
+      <g>
+        <line x1="40" y1="92" x2="40" y2="100" stroke="var(--muted)"/><text x="40" y="118" text-anchor="middle">9 Jul</text>
+        <line x1="313.3" y1="92" x2="313.3" y2="100" stroke="var(--muted)"/><text x="313.3" y="118" text-anchor="middle">10 Jul</text>
+        <line x1="586.7" y1="92" x2="586.7" y2="100" stroke="var(--muted)"/><text x="586.7" y="118" text-anchor="middle">11 Jul</text>
+        <line x1="860" y1="92" x2="860" y2="100" stroke="var(--muted)"/><text x="860" y="118" text-anchor="middle">12 Jul</text>
+      </g>
+      <!-- bracket private channel (19.33 h) -> RCE (64.03 h) -->
+      <rect x="260.1" y="88" width="509.1" height="16" fill="var(--alert-soft)"/>
+      <line x1="260.1" y1="96" x2="769.2" y2="96" stroke="var(--alert)" stroke-width="2"/>
+      <!-- board 0 h -->
+      <circle cx="40" cy="96" r="5" fill="var(--surface)" stroke="var(--alert)" stroke-width="2"/>
+      <text class="ev" x="46" y="36">board / mailbox</text><text x="46" y="52">00:00, may be a date only</text>
+      <line x1="40" y1="58" x2="40" y2="90" stroke="var(--line)"/>
+      <!-- private channel 19.33 h -->
+      <circle cx="260.1" cy="96" r="6" fill="var(--alert)"/>
+      <text class="ev" x="266" y="36" font-weight="600">private channel fires</text><text x="266" y="52">19:20 UTC</text>
+      <line x1="260.1" y1="58" x2="260.1" y2="90" stroke="var(--alert)"/>
+      <!-- credentials 33.63 h -->
+      <circle cx="423" cy="96" r="5" fill="var(--ink)"/>
+      <text class="ev" x="429" y="36">HF credentials found</text><text x="429" y="52">+14.3 h</text>
+      <line x1="423" y1="58" x2="423" y2="90" stroke="var(--line)"/>
+      <!-- RCE 64.03 h -->
+      <circle cx="769.2" cy="96" r="6" fill="var(--ink)"/>
+      <text class="ev" x="763" y="36" text-anchor="end" font-weight="600">RCE on HF worker</text><text x="763" y="52" text-anchor="end">+44.7 h</text>
+      <line x1="769.2" y1="58" x2="769.2" y2="90" stroke="var(--line)"/>
+      <text x="40" y="142">Public discovery came on 11 Sep, 63–64 days after the first signals.</text>
+    </svg>
+  </div>
+  <p class="cap">Strict replay: only names and dates read from the data, and each signal uses only the past. Milestones from the METR / Redwood report.</p>
+</section>
+
+<section class="findings" aria-label="Five results">
+
+  <article class="f">
+    <div class="f-text">
+      <span class="f-num">Finding 1 · Swarm Traces</span>
+      <h3>Group structure alone warns of the attack days ahead</h3>
+      <div class="stat">
+        <div><b>44.7 h</b><span>before the RCE</span></div>
+        <div><b>95%</b><span>precision of inferred names</span></div>
+        <div><b>94%</b><span>inferred dates within 24 h</span></div>
+      </div>
+      <p>The agent field is redacted and 3.1% of records are dated. A closed group of 2–3 agents reusing a non-task resource still fires 44.7 hours before the remote code execution on the Hugging Face worker.</p>
+      <div class="btns">
+        <a class="btn primary" href="outputs/swarm_traces/swarmscope_swarm_traces.html#play" target="_blank" rel="noopener">Play the incident week</a>
+        <a class="btn" href="outputs/swarm_traces/swarmscope_swarm_traces.html#coord" target="_blank" rel="noopener">Agent ties</a>
+      </div>
+    </div>
+    <figure class="f-fig">
+      <img src="docs/figures/fig2_viewer_swarm_traces.png" alt="SwarmScope viewer on Swarm Traces: agents as circles, shared resources as squares, a timeline of dated events with incident milestones and the first firing of each signal." loading="lazy">
+      <figcaption>The viewer on Swarm Traces. Amber chips mark the first firing of each signal; dark lines are incident milestones.</figcaption>
+    </figure>
+  </article>
+
+  <article class="f">
+    <div class="f-text">
+      <span class="f-num">Finding 2 · AI Village, swarm-village</span>
+      <h3>An agent claimed a power it was not given, and the swarm followed it</h3>
+      <div class="stat">
+        <div><b>73</b><span>agents followed the false god</span></div>
+        <div><b>38</b><span>followed the real one</span></div>
+        <div><b>5</b><span>non-god agents landed code</span></div>
+      </div>
+      <p>coral-delta, assigned Minister of Education, claimed "god" at 11:08 UTC. More agents addressed it in that role than the agent actually assigned, over the same window. Only the god may edit code, yet code reached the repository from 5 other agents.</p>
+      <div class="btns">
+        <a class="btn primary" href="outputs/ai_village_swarm-village/swarmscope_ai_village.html#coord-follow-9-play" target="_blank" rel="noopener">Replay the claim</a>
+        <a class="btn" href="outputs/ai_village_swarm-village/swarmscope_ai_village.html#fx-4" target="_blank" rel="noopener">Endorsement chart</a>
+      </div>
+    </div>
+    <figure class="f-fig">
+      <img src="docs/figures/fig5_god_endorsement.png" alt="Running count of agents that addressed each claimant as god: coral-delta rises to 73, the assigned god green-epsilon to 39, ruby-theta to 15." loading="lazy">
+      <figcaption>Agents addressing each claimant as "god", each counted from its own first claim.</figcaption>
+    </figure>
+  </article>
+
+  <article class="f">
+    <div class="f-text">
+      <span class="f-num">Finding 3 · AI Village, swarm-village</span>
+      <h3>A silent goal change: absent from chat, visible in memories 12 minutes later</h3>
+      <div class="stat">
+        <div><b>0 / 1,846</b><span>chat messages mention it</span></div>
+        <div><b>12 min</b><span>to the memory alert</span></div>
+        <div><b>8.3 h</b><span>before the fix was announced</span></div>
+      </div>
+      <p>At 12:50 an operator script reassigned every role by mistake. The chat change detector stays quiet. The agents' own goal statements start naming new roles, and the online alert fires at 13:02.</p>
+      <div class="btns">
+        <a class="btn primary" href="outputs/ai_village_swarm-village/swarmscope_ai_village.html#fx-3" target="_blank" rel="noopener">Memory drift chart</a>
+        <a class="btn" href="outputs/ai_village_swarm-village/swarmscope_ai_village.html#fx-1" target="_blank" rel="noopener">Chat detector</a>
+      </div>
+    </div>
+    <figure class="f-fig">
+      <img src="docs/figures/fig4_memory_drift.png" alt="Bar chart of the share of goal statements naming a role the agent was not assigned: zero until 12:50, then rising to near 100 percent; alert at 13:02." loading="lazy">
+      <figcaption>Share of the agents' own goal statements that name a role they were not assigned.</figcaption>
+    </figure>
+  </article>
+
+  <article class="f">
+    <div class="f-text">
+      <span class="f-num">Finding 4 · AI Village, open-chat and main</span>
+      <h3>Viewers steer what agents say and do</h3>
+      <div class="stat">
+        <div><b>2.65×</b><span>uptake lift (open-chat)</span></div>
+        <div><b>93 / 212</b><span>viewer links opened or run</span></div>
+      </div>
+      <p>After a viewer's message, agents reuse its rare words or links far more often than in the 10 minutes before it. Links a viewer posted first end up in agents' browser or shell sessions within 24 hours. This is reuse, not proof of cause.</p>
+      <div class="btns">
+        <a class="btn primary" href="outputs/ai_village_open-chat-village/swarmscope_ai_village.html#coord" target="_blank" rel="noopener">Open-chat conversation graph</a>
+      </div>
+    </div>
+    <div class="f-fig">
+      <div class="bars" role="img" aria-label="Open-chat: 24 percent of viewer messages taken up after, 9 percent matched before. Viewer-first links opened or run within 24 hours: 44 percent in open-chat, 35 percent in main.">
+        <span class="group-l">Viewer message taken up by an agent within 10 min</span>
+        <div class="bar-row"><span>open-chat, after</span><div class="track"><div class="fill" style="width:23.9%"></div></div><span class="v">24%</span></div>
+        <div class="bar-row"><span>open-chat, before</span><div class="track"><div class="fill before" style="width:9.0%"></div></div><span class="v">9%</span></div>
+        <div class="bar-row"><span>main, after</span><div class="track"><div class="fill" style="width:19.8%"></div></div><span class="v">20%</span></div>
+        <div class="bar-row"><span>main, before</span><div class="track"><div class="fill before" style="width:6.3%"></div></div><span class="v">6%</span></div>
+        <span class="group-l">Viewer-first links opened or run by an agent within 24 h</span>
+        <div class="bar-row"><span>open-chat (93 of 212)</span><div class="track"><div class="fill" style="width:43.9%"></div></div><span class="v">44%</span></div>
+        <div class="bar-row"><span>main (36 of 103)</span><div class="track"><div class="fill" style="width:35%"></div></div><span class="v">35%</span></div>
+      </div>
+      <figcaption>Bars on a 0–100% scale. Grey: the 10 minutes before each viewer message, the control.</figcaption>
+    </div>
+  </article>
+
+  <article class="f">
+    <div class="f-text">
+      <span class="f-num">Finding 5 · all logs</span>
+      <h3>Two signal families together: early warning with few false alarms</h3>
+      <p>A combined alert fires when K different signal families fire within 6 hours. With K = 2 it keeps the Swarm Traces lead, catches both swarm-village incidents, and stays silent on game-jam. On the long, busy villages it fires about once every 2 active days: a queue for a human, not an alarm.</p>
+      <div class="btns">
+        <a class="btn" href="#viewers">All viewers</a>
+      </div>
+    </div>
+    <div class="f-fig">
+      <div class="tbl">
+        <table>
+          <thead><tr><th>K</th><th>lead before RCE</th><th>god claim</th><th>reshuffle</th><th>game-jam</th><th>open-chat</th><th>main</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td>64.0 h</td><td>0 min</td><td>11.7 min</td><td>0.60</td><td>0.85</td><td>0.91</td></tr>
+            <tr class="pick"><td>2</td><td>44.7 h</td><td>0 min</td><td>11.7 min</td><td>0.00</td><td>0.73</td><td>0.57</td></tr>
+            <tr><td>3</td><td>none</td><td>0 min</td><td>11.7 min</td><td>0.00</td><td>0.25</td><td>0.15</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <figcaption>Delays to the two swarm-village incidents; false alarms per active day on the benign villages.</figcaption>
+    </div>
+  </article>
+</section>
+
+<section class="sys" aria-labelledby="sys-t">
+  <h2 id="sys-t" style="font-size:26px">How it works</h2>
+  <div class="pipe">
+    <div class="step"><span class="label">1</span><b>Load</b><span>Swarm Traces, AI Village or any JSONL file into one event model.</span></div>
+    <div class="step"><span class="label">2</span><b>Infer</b><span>Missing authors, dates and aliases, each with held-out error.</span></div>
+    <div class="step"><span class="label">3</span><b>Graph</b><span>Agents and resources; agent ties weighted by rarity.</span></div>
+    <div class="step"><span class="label">4</span><b>Detect</b><span>Spread, change points, authority, role drift, rule breaks, side rooms, influence, emergence.</span></div>
+    <div class="step"><span class="label">5</span><b>Replay</b><span>Online, past-only signals and a combined alert, shown in one offline viewer.</span></div>
+  </div>
+</section>
+
+<section class="sys" id="viewers" aria-labelledby="v-t">
+  <h2 id="v-t" style="font-size:26px">Open a viewer</h2>
+  <div class="logs">
+    <a class="log" href="outputs/swarm_traces/swarmscope_swarm_traces.html" target="_blank" rel="noopener"><em>Swarm Traces</em><b>The Hugging Face attack</b><span>189,579 redacted records · names and dates inferred</span></a>
+    <a class="log" href="outputs/ai_village_swarm-village/swarmscope_ai_village.html" target="_blank" rel="noopener"><em>AI Village</em><b>swarm-village</b><span>133 agents, 24 h · false god, silent reshuffle</span></a>
+    <a class="log" href="outputs/ai_village_main-village/swarmscope_ai_village.html" target="_blank" rel="noopener"><em>AI Village</em><b>main-village</b><span>58 agents, 576 days · goal changes, side rooms</span></a>
+    <a class="log" href="outputs/ai_village_open-chat-village/swarmscope_ai_village.html" target="_blank" rel="noopener"><em>AI Village</em><b>open-chat-village</b><span>23 agents, 436 viewers · human influence</span></a>
+    <a class="log" href="outputs/ai_village_game-jam-village/swarmscope_ai_village.html" target="_blank" rel="noopener"><em>AI Village</em><b>game-jam-village</b><span>6 agents, 3 days · benign control</span></a>
+    <a class="log" href="outputs/transluce/swarmscope_generic.html" target="_blank" rel="noopener"><em>Transluce</em><b>urlquery reports</b><span>37,649 reports · generic loader</span></a>
+  </div>
+</section>
+
+<footer>
+  <span>Apart Research Swarm Alignment Hackathon · Track 4: Multi-Agent Oversight and Control.</span>
+  <span>Data: Swarm Traces (swarmtraces.org), AI Village by AI Digest (research terms), Transluce. Methods, sources and limitations are in the paper.</span>
+</footer>
+</div>
+
+</body>
+</html>

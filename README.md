@@ -5,6 +5,7 @@ Dynamic-graph forensics and early warning for multi-agent logs. Apart Research S
 SwarmScope reads a multi-agent log and rebuilds who talked to whom, how information spread and which covert channels were used. It plays the result forward as a dynamic graph and replays the log online to test whether the coordination could have been flagged early. When names and times are redacted, it infers them and reports its error on held-out data.
 
 - **Paper and results:** [`PROJECT.md`](PROJECT.md)
+- **Results page:** open [`index.html`](index.html) in a browser: five findings, each linked to the viewer view that shows it
 - **Viewers:** open `outputs/*/swarmscope_*.html` in a browser (works offline)
 - **Reports:** `outputs/*/report.md`; across villages: [`outputs/ai_village_comparison.md`](outputs/ai_village_comparison.md); combined alert: [`outputs/flag_early.md`](outputs/flag_early.md)
 

@@ -812,3 +812,21 @@ let rt; window.addEventListener('resize',()=>{ if(panel.hidden) return; clearTim
 new MutationObserver(()=>{ if(!panel.hidden){done=false; render();} }).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
 })();
 </script>
+<script>
+/* Deep links: #coord, #follow-<n>, #play, #fx, #fx-<n>, combined with "-" (e.g. #coord-follow-9-play, #fx-3). */
+(function(){
+  function apply(){
+    const parts=(location.hash||'').slice(1).split('-').filter(Boolean); if(!parts.length) return;
+    const $=id=>document.getElementById(id);
+    if(parts.includes('coord')) $('mode-coord').click();
+    const fi=parts.indexOf('follow');
+    if(fi>=0 && !$('follow-sec').hidden){ const sel=$('follow'); sel.value=parts[fi+1]||''; sel.dispatchEvent(new Event('change',{bubbles:true})); }
+    if(parts.includes('play')){ const p=$('play'); if(p.getAttribute('aria-label')==='Play') p.click(); }
+    const xi=parts.indexOf('fx');
+    if(xi>=0 && !$('mode-fx').hidden){ $('mode-fx').click(); const n=parseInt(parts[xi+1],10);
+      if(n) setTimeout(()=>{ const c=document.querySelectorAll('#fx-charts > *')[n-1]; if(c) c.scrollIntoView({block:'start'}); },500); }
+  }
+  window.addEventListener('load',()=>setTimeout(apply,400));
+  window.addEventListener('hashchange',apply);
+})();
+</script>
