@@ -1,5 +1,7 @@
 # Independent review of SwarmScope headline claims
 
+This review checked an earlier draft of the claims. `PROJECT_PLAN.md` §11.8 compares the reviewer's values below with the current ones.
+
 I computed everything below from the raw tables with my own short standard-library scripts (one-off checks, not kept in the repo). I did not read project outputs, project code or PROJECT_PLAN.md. Timestamps are naive UTC, with fractional seconds normalised to 6 digits. All joins use agent IDs.
 
 ## 1. swarm-village size and span

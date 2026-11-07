@@ -15,7 +15,7 @@ When names and times are missing (as in the redacted Swarm Traces data), SwarmSc
 - Independent review of the headline claims, and blind-labelled precision/recall: [`review/`](review/)
 - Interactive viewers: open `outputs/*/swarmscope_*.html` in a browser. They work offline. Use **Follow an item** to watch a file, commit, coined term or role claim spread from agent to agent.
 
-When most events already name their author (AI Village), SwarmScope skips inference and adds detectors for the conversation network by phase, information diffusion, online change points, authority mismatch (an agent claiming a role it was not given), role drift (agents' own goals vs their assigned roles) and rule breaks in their shell commands. It also checks side rooms (private groups, items leaking into the main room), human influence (did viewers' messages and links change what agents said and did), goal adoption after a village goal changes, and Riedl's information-theoretic emergence test. On `swarm-village` it catches an unassigned agent claiming the "god" role (73 agents followed it), and, from the agents' memories, an operator error that silently reassigned every role (alert 12 minutes after it; the chat never mentioned it). See `PROJECT_PLAN.md` §10. In the viewer, the **Forensics charts** button shows these results on one clock: change-detector scores, role talk around the reshuffle, the agents' own goals drifting after it, who the swarm treated as god, and how files, commits and coined terms spread.
+When most events already name their author (AI Village), SwarmScope skips inference and adds detectors for the conversation network by phase, information diffusion, online change points, authority mismatch (an agent claiming a role it was not given), role drift (agents' own goals vs their assigned roles) and rule breaks in their shell commands. It also checks side rooms (private groups, items leaking into the main room), human influence (did viewers' messages and links change what agents said and did), goal adoption after a village goal changes, and Riedl's information-theoretic emergence test. On `swarm-village` it catches an unassigned agent claiming the "god" role (73 agents followed it), and, from the agents' memories, an operator error that silently reassigned every role (alert 12 minutes after it; the chat never mentioned it). See `PROJECT_PLAN.md` §11 (findings) and §7 (terms and sources). In the viewer, the **Forensics charts** button shows these results on one clock: change-detector scores, role talk around the reshuffle, the agents' own goals drifting after it, who the swarm treated as god, and how files, commits and coined terms spread.
 
 ## Quick start
 
@@ -23,7 +23,7 @@ When most events already name their author (AI Village), SwarmScope skips infere
 # 1. Analyze Swarm Traces (Python 3.9+, standard library only, about 1 minute)
 python -m swarmscope.cli analyze Swarm-Traces-Data/redacted.jsonl.gz \
     --format swarm_traces --out outputs/swarm_traces --inference balanced
-#    --inference: off | precise | balanced | broad (accuracy table in PROJECT_PLAN.md §7)
+#    --inference: off | precise | balanced | broad (accuracy table in PROJECT_PLAN.md §8.2)
 
 # 2. Get AI Village (gated: accept the terms on huggingface.co first)
 pip install huggingface_hub
