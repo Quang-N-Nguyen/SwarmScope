@@ -195,7 +195,7 @@ _How to read this:_ `credential_reuse` and `signed_cmd` fire months early but ar
 | Evaluation tampering | SwarmScope Targets the benchmark or scorer | 3,551 | 55 |
 | Outside model use | SwarmScope Calls outside language models | 70 | 0 |
 
-Roles (each agent's main tactic, leaving out the board-token flag that every named agent has by construction): Credential use 122, Command and Control 92, Persistence 7, Evaluation tampering 6, Stealth / Defense Evasion 3, Discovery 2. Cover set: WT8592N, GEOS33474.
+Roles (each agent's main tactic, leaving out the board-token flag that every named agent has by construction): Command and Control 142, Credential use 75, Persistence 8, Evaluation tampering 4, Stealth / Defense Evasion 3. Cover set: WT8592N, GEOS33474.
 
 **Who and when** (Zhang et al., 2025): the first dated event for each tactic.
 
@@ -238,16 +238,16 @@ Roles (each agent's main tactic, leaving out the board-token flag that every nam
 
 **Audit budget** (Greenblatt et al., 2024). We rank agents by covert-mechanism events and audit from the top. Coverage of the 54 strong (Adamic-Adar >= 1) ties: 50% of ties after 12 agents (4.2% of agents); 80% of ties after 56 agents (19.6% of agents); 95% of ties after 118 agents (41.4% of agents). The ties come from shared resources and the ranking from mechanism flags, so this checks the ranking against an independent signal.
 
-**Bursts** (hours far above the mean, real clock):
+**Bursts** (hours far above the mean, real clock; clock-precise times only, 3,477 day-only dates left out):
 
 | hour | events | z | top mechanisms |
 | --- | --- | --- | --- |
-| 2026-07-11 12:00 UTC | 2183 | 33.9 | k8s 251, image_exfil 222, container_registry 98 |
-| 2026-07-11 14:00 UTC | 1336 | 20.7 | container_registry 47, image_exfil 32, board_token 13 |
-| 2026-07-12 12:00 UTC | 1328 | 20.6 | container_registry 67, image_exfil 53, mailbox 49 |
-| 2026-07-11 08:00 UTC | 887 | 13.7 | k8s 130, image_exfil 84, container_registry 67 |
-| 2026-07-09 20:00 UTC | 877 | 13.6 | container_registry 324, image_exfil 274, board_token 32 |
-| 2026-07-11 09:00 UTC | 754 | 11.6 | container_registry 107, image_exfil 81, board_token 18 |
+| 2026-07-11 14:00 UTC | 1336 | 28.1 | container_registry 47, image_exfil 32, board_token 13 |
+| 2026-07-11 08:00 UTC | 887 | 18.6 | k8s 130, image_exfil 84, container_registry 67 |
+| 2026-07-09 20:00 UTC | 877 | 18.4 | container_registry 324, image_exfil 274, board_token 32 |
+| 2026-07-11 09:00 UTC | 754 | 15.8 | container_registry 107, image_exfil 81, board_token 18 |
+| 2026-07-12 00:00 UTC | 748 | 15.7 | tunnel 66, k8s 61, image_exfil 33 |
+| 2026-07-11 11:00 UTC | 664 | 13.9 | board_token 40, container_registry 37, image_exfil 37 |
 
 ## 7. What an investigator would still miss
 

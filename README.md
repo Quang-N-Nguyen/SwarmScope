@@ -29,6 +29,7 @@ for v in swarm-village game-jam-village open-chat-village main-village; do
 done
 python scripts/compare_villages.py      # one table across villages
 python scripts/flag_early.py            # combined alert: lead time vs false alarms
+python scripts/validate_mission.py      # mission tests with known answers -> outputs/validation.json
 
 # Transluce (unzip the release from transluce.org/agent-activity into data/transluce)
 python scripts/transluce_to_jsonl.py data/transluce/urlquery-agent-activity-2026-09-22-v5 data/transluce/reports.jsonl

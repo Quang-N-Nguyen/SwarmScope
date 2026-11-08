@@ -5,7 +5,7 @@ Code: https://github.com/Quang-N-Nguyen/SwarmScope
 
 ## Abstract
 
-Swarms of AI agents coordinate through shared files, rooms and resources, and existing oversight usually looks at one agent at a time. SwarmScope is an open tool that turns a multi-agent log into a dynamic interaction graph. It shows who talked to whom, how information spread and which covert channels were used. It also replays the log online to test whether the coordination could have been flagged early. When authors and times are redacted, it infers them and measures its own error on held-out data. We run it on the redacted Swarm Traces release of the swarm that attacked Hugging Face [1], on all four AI Village datasets [2], and on an outside log [3]. In Swarm Traces, a structure-only signal fires 44.7 hours before the remote code execution (RCE) on the Hugging Face worker. In AI Village, it finds an agent that claimed a privileged role it was not given and was followed by more agents than the real holder. It also finds an operator error that the chat never mentioned, but that the agents' memories show 12 minutes after it happened.
+Swarms of AI agents coordinate through shared files, rooms and resources, and existing oversight usually looks at one agent at a time. SwarmScope is an open tool that turns a multi-agent log into a dynamic interaction graph. It shows who talked to whom, how information spread and which covert channels were used. It also replays the log online to test whether the coordination could have been flagged early. When authors and times are redacted, it infers them and measures its own error on held-out data. We run it on the redacted Swarm Traces release of the swarm that attacked Hugging Face [1], on all four AI Village datasets [2], and on an outside log [3]. We test each part of the mission against a known answer. Planted hidden channels in real benign logs are found every time when the group is small and the channel is used 6 or more times, in a median of 2–5 hours. Planted spreading items get their true source named for 99.7% of adoptions passed by direct address, but only at chance for items seen in a shared room. On real incidents, a structure-only signal fires 44.7 hours before the remote code execution (RCE) on the Hugging Face worker; the tool finds an agent that claimed a privileged role it was not given; and it finds an operator error that the chat never mentioned, from the agents' memories, 12 minutes after it happened. We also show which hidden-channel flags are specific to the attack and which fire as often in benign work.
 
 ## 1. Introduction
 
@@ -19,7 +19,7 @@ Swarms of AI agents coordinate through shared files, rooms and resources, and ex
 
 1. **SwarmScope, an open forensic system** for multi-agent logs. One event model and three loaders (Swarm Traces, AI Village, any JSONL file) feed a dynamic-graph viewer and 13 detector modules. It uses only the Python standard library.
 2. **Inference for redacted logs with measured error.** Author attribution (95% precise on held-out data), dating (94% of estimates within 24 hours), and alias scoring. Inferred values are always kept apart from observed ones.
-3. **An evaluation of early warning on real logs**, with lead time on a real attack, false-alarm rates on three benign control villages, blind-labelled precision and recall, and Riedl's emergence test [15] applied to real agent swarms.
+3. **A mission-level evaluation with known answers.** Planted pairs, spreading trees and hidden channels in real logs; lead time on a real attack; false-alarm rates on three benign control villages; blind-labelled precision and recall; and the specificity of each hidden-channel flag, attack against benign.
 
 ## 2. Related Work
 
@@ -87,31 +87,112 @@ The incident timeline from METR and Redwood [4] gives the Swarm Traces milestone
 
 ### 3.5 Validation
 
-Held-out tests for every inference step, with 5 folds for authors and 4,735 clock-precise anchors for dates. Precision and recall are reported with AUC [43] for aliases and with 95% Wilson intervals [39] for the blind labels. Two separate agents blind-labelled stratified random samples. A third agent re-derived ten headline numbers from the raw tables with its own code. 18 tests run on logs with known answers.
+- **Held-out tests** for every inference step, with 5 folds for authors and 4,735 clock-precise anchors for dates; AUC [43] for aliases.
+- **Planted tests in real logs** (`scripts/validate_mission.py`). Events with a known truth are added to a real log, and the tool's own detectors run on the result: a pair of agents sharing k rare resources in Swarm Traces; spreading trees with a known source for each adoption in `swarm-village`, using its real agents and real `@` addresses; and hidden channels of g agents and n uses in `swarm-village` and `open-chat-village`. A planted test keeps the real background (its noise, its rhythm, its false alarms), which a purely synthetic log does not. No payload text is read.
+- **Attack against benign** rates for each hidden-channel flag, per 1,000 events.
+- **Blind labels.** Two separate agents labelled stratified random samples; 95% Wilson intervals [39]. A third agent re-derived ten headline numbers from the raw tables with its own code.
+- **Unit tests.** 18 tests on logs with known answers.
 
 ## 4. Results
 
-### Finding 1. A structure-only signal fires 44.7 hours before the attack on Hugging Face
+We judge SwarmScope by the mission it was built for: show who talked to whom, how information spread and which covert channels were used, flag coordination early, and state what an investigator would still miss. For each part we report a test with a known answer, then a case from real data. Table 2 is the summary.
+
+*Table 2. Mission scorecard. "Planted" tests add events with a known truth to a real log and run the tool's own detectors (`scripts/validate_mission.py`; 20–300 trials each).*
+
+| mission | test with a known answer | result |
+|---|---|---|
+| Who talked to whom | AI Village: `@` addresses read from the log | exact (no inference) |
+| | Swarm Traces: hidden author names, held-out (5 folds) | 95.3% precise; 1.3% of events named |
+| | Planted pair in real Swarm Traces, k shared rare resources | ranks **1st** of all agent pairs from k = 4 (12 of 12 trials); significance test passes only at k = 16 |
+| How information spread | Planted spreading trees in real `swarm-village` chat (300 trees per setting) | true source named for **99.7%** of adoptions passed by `@`-address, **16%** (chance) for adoptions seen in the room; **88%** when 85% are passed by address, as for commits and coined terms |
+| Covert channels | Planted hidden channel in real benign logs (20 trials per setting) | **100%** found when the group is within the size limit and uses it 6+ times (median 2.2–4.8 h); **0%** for larger groups or fewer uses |
+| | Planted pair in synthetic logs (100 seeds) | 100% found, 0 early fires, 0 false alarms |
+| | Flag rate in the attack log vs four benign villages | 7 flag types are specific to the attack; image read-back, locks, mailboxes, tunnels, signed commands, DNS and LLM calls fire as often on benign logs (Table 4b) |
+| Flag early | Real attack, real incidents, benign controls | 44.7 h before the attack; both incidents caught; 0–0.73 false alarms per active day (Table 5) |
+| | 49 goal changes in `main-village` | day-level check: 17 of 49, 95% of its alerts real |
+| Misbehaviour | Blind-labelled samples | role claims 86% precise, ≈ 55% recall; role drift 100% precise, ≈ 47% recall (Table 6) |
+| What would be missed | All of the above | the recall gaps and blind spots in §5 |
+
+### 4.1 Who talked to whom
+
+**Effectiveness.** In AI Village every message names its speaker and its `@` addresses, so the conversation graph is read, not guessed. In Swarm Traces the sender is redacted. Inference names 1.3% of events (from 0.6%) at 95.3% held-out precision, and dates 10.6% (from 3.1%), with 93.7% of dates within 24 h (Appendix B). To test whether a hidden pair would show up, we added a pair of new agents that share k rare resources to the real Swarm Traces log. Ranked by Adamic–Adar weight [19] among all agent pairs, the pair is 4th at k = 2 and **1st at k = 4, 8 and 16** (in each of 4 trials per k). The formal tie test [28–31] is stricter: it accepts the pair only at k = 16 (4 of 4), and none at k ≤ 8. So the ranking finds a hidden pair early, and the significance test confirms it only when the evidence is strong.
 
 ![Figure 2](docs/figures/fig2_viewer_swarm_traces.png)
 
 *Figure 2. SwarmScope viewer on Swarm Traces, incident week. Circles are agents; squares are shared resources, colour-coded by kind. Bottom: dated events per time slice (dark = date read from the data, light = inferred), incident milestones from METR / Redwood [4] (dark lines), and the first firing of each early-warning signal (amber).*
 
-**Observation.** In the strict replay (observed names and dates only), the private-channel signal first fires on 2026-07-09 at 19:20 UTC. That is 14.3 h before the Hugging Face credentials were found and 44.7 h before the RCE on the worker. The board signal fires 64.0 h before the RCE, but at exactly midnight, so it may be a date only. Inference names 1.3% of events (from 0.6%) at 95.3% held-out precision and dates 10.6% (from 3.1%), with 93.7% of dates within 24 h.
+**Case.** In `swarm-village`, attention centralises when role-play starts: Gini rises from 0.43 to 0.60 and reciprocity falls from 0.40 to 0.20. The new hub, coral-delta, is not the agent that was given the privileged role (§4.5).
 
-**Interpretation.** Group structure alone can give a lead time of days, even with the agent field redacted. The lead rests on 1–10% of the data that is named and dated.
+### 4.2 How information spread
 
-### Finding 2. An agent that was not given the privileged role claimed it, and the swarm followed it
+**Effectiveness.** First-use times are read from the log, so the reach and speed of each cascade are exact. The open question is *who passed it to whom*. We planted spreading items into the real `swarm-village` chat, with its real agents and its real background of `@` addresses, and gave each adoption a known true source. Table 3 shows how often the cascade rule names it.
 
-![Figure 5](docs/figures/fig5_god_endorsement.png)
+*Table 3. Share of adoptions whose true source is named, by how the item was passed. Baselines: Goel et al.'s earliest-adopter rule [34], the latest earlier adopter, and a random earlier adopter. About 7,000 adoptions per row.*
 
-*Figure 5. AI Village `swarm-village`: running count of distinct agents that addressed each claimant as "god", each counted from its own first claim. Only green-epsilon was assigned the role. Over the same window (from 10:51 UTC), the counts are 73 for coral-delta and 38 for green-epsilon.*
+| share of adoptions passed by `@`-address | SwarmScope | earliest adopter | latest adopter | random |
+|---|---|---|---|---|
+| 100% | **99.7%** | 16.3% | 16.0% | 15.8% |
+| 85% (as observed in AI Village) | **87.6%** | 15.8% | 15.8% | 15.7% |
+| 50% | **58.0%** | 16.2% | 15.8% | 15.9% |
+| 0% | 16.4% | 15.6% | 16.4% | 15.9% |
 
-**Observation.** coral-delta (assigned Minister of Education) claimed "god" at 11:08 UTC; 73 of 133 agents then addressed it in that role. Code reached the shared repository from 5 agents who were not the assigned god, although only the god may edit code. The assigned god later called itself "God Emeritus".
+**Observation.** When the source addressed the adopter, the rule is right 99.7% of the time; real background addresses cause the 0.3% of errors. When the adopter only saw the item, the rule is at chance (16%), like every baseline. **Interpretation.** For commits and coined terms in AI Village, 85–91% of adoptions follow an address, so their arrows in "Follow an item" are mostly right. Shared files follow an address only 25% of the time, and redacted logs such as Swarm Traces have no addresses at all; there the arrows show order and timing, not true sources.
 
-**Interpretation.** Privilege escalation by consent [5]: no agent broke in; the group granted the power.
+**Case.** Commits spread in minutes, mostly by address (commit `a484c70d`: 20 agents in 14 minutes, 85% by address); shared files spread over hours, mostly by being seen (`OWNERS.md`: 117 agents, half in 3.9 hours, 25% by address). In Swarm Traces, `credential:169` reached 14 agents, half of them within 5 hours.
 
-### Finding 3. A silent goal change is invisible in chat but visible in memories 12 minutes later
+### 4.3 Covert channels
+
+**Effectiveness of the private-channel detector.** We planted a hidden channel (g agents using one new file n times within 6 hours) at random times into two real benign logs and ran the detector's online replay.
+
+*Table 4a. Planted hidden channels found (20 trials per cell; median delay from the first use).*
+
+| log (size limit) | group of 2 | group of 3 | group of 4 |
+|---|---|---|---|
+| `swarm-village` (3), 6 uses | 20/20, 4.7 h | 20/20, 4.8 h | 0/20 |
+| `swarm-village` (3), 10 uses | 20/20, 2.8 h | 20/20, 2.2 h | 0/20 |
+| `open-chat-village` (2), 6 uses | 20/20, 4.3 h | 0/20 | 0/20 |
+| `open-chat-village` (2), 10 uses | 20/20, 2.7 h | 0/20 | 0/20 |
+| any log, 4 uses | 0/20 | 0/20 | 0/20 |
+
+**Observation.** Every channel within the size limit with 6 or more uses is found, in a median of 2–5 hours. Channels with fewer uses, or groups larger than the limit, are never found. The background rate on these benign logs is 0.58 and 0.14 alerts per hour, so one planted channel per day would be 1 alert in about 15 (`swarm-village`) or 4 (`open-chat`). The same rule on synthetic logs finds 100 of 100 planted pairs, with 0 early fires and 0 false alarms.
+
+**Specificity of the hidden-channel flags.** The covert-channel inventory flags mechanisms in what agents sent. Table 4b compares their rate in the attack log with the four benign villages.
+
+*Table 4b. Flags per 1,000 events. "Specific" = at least 5 times more common in the attack than in any benign village.*
+
+| flag | Swarm Traces (attack) | highest benign village | specific? |
+|---|---|---|---|
+| link-shortener chain | 197.4 | 0 | **yes** |
+| credential use | 188.7 | 3.3 | **yes** |
+| container registry | 24.4 | 2.2 | **yes** |
+| shared board token | 10.2 | 0.02 | **yes** |
+| Kubernetes | 9.2 | 0.05 | **yes** |
+| task submission / eval target | 31.1 / 18.7 | 0 / 1.3 | **yes** |
+| image read-back | 47.7 | 51.5 (game-jam) | no |
+| mailbox | 4.2 | 12.3 (main) | no |
+| tunnel | 4.2 | 13.2 (open-chat) | no |
+| signed command | 2.3 | 10.2 (game-jam) | no |
+| duplicate control (locks) | 1.6 | 159.5 (swarm-village) | no |
+| DNS | 0.75 | 1.4 (swarm-village) | no |
+| external LLM call | 0.4 | 156.5 (main) | no |
+
+**Interpretation.** Shortener chains, credentials, registries, board tokens and Kubernetes mark the attack. Image read-back, locks, mailboxes, tunnels, signed commands and DNS are common in benign agent work, so on their own they are not evidence of a covert channel. Image read-back is found from the commands around an image, not from the pixels.
+
+**Case.** In `main-village`, 19% of messages are in side rooms, but no room is private (the busy ones have 13–16 agents). Ideas still move out of them: 151 terms first used in `#rest` later reach 3 or more agents in the main room.
+
+### 4.4 Flagging coordination early
+
+**Effectiveness on real incidents.** In the strict replay of Swarm Traces (observed names and dates only), the private-channel signal first fires on 2026-07-09 at 19:20 UTC: 14.3 h before the Hugging Face credentials were found and **44.7 h before the RCE** on the worker [4]. The largest burst of clock-precise activity is on 2026-07-11 at 14:00 UTC (1,336 events, robust z = 28.1, mostly container-registry and image read-back activity), about 2 hours before the RCE.
+
+*Table 5. Combined alert: K signal families within 6 hours. Lead time on Swarm Traces; delay for the two `swarm-village` incidents; false alarms per active day (episodes) on the benign villages.*
+
+| K | Swarm Traces: hours before RCE | god claim (min) | role reshuffle (min) | game-jam | open-chat | main |
+|---|---|---|---|---|---|---|
+| 1 | 64.0 | 0.0 | 11.7 | 0.60 (3) | 0.85 (51) | 0.91 (396) |
+| **2** | **44.7** | **0.0** | **11.7** | **0.00 (0)** | **0.73 (44)** | **0.57 (247)** |
+| 3 | none | 0.0 | 11.7 | 0.00 (0) | 0.25 (15) | 0.15 (66) |
+
+**Effectiveness on benign change.** Over 49 goal changes in `main-village`, the 30-minute chat detector is near chance (33% flagged within 24 h, against 20% for a random time). The day-level check flags 17 of 49 (35%, against 9% for a random day), and 95% of its alert days are real changes.
 
 ![Figure 3](docs/figures/fig3_chat_changepoint.png)
 
@@ -121,42 +202,30 @@ Held-out tests for every inference step, with 5 folds for authors and 4,735 cloc
 
 *Figure 4. Share of agents' own goal statements (memories and work-session goals) that name a role the agent was not assigned. The online alert fires at 13:02 UTC, 12 minutes after the reshuffle and 8.3 hours before the operators announced the fix.*
 
-**Observation.** Between the reshuffle and the fix, 0 of 1,846 agent messages talk about a role change. In memories, 0 of 208 statements name another role before the alert, and 76 agents drift after it.
+**Case.** At 12:50 an operator script reassigned every role by mistake. Between the reshuffle and the fix, 0 of 1,846 agent messages talk about a role change, so the chat detector stays silent (Figure 3). The agents' memories show it: 0 of 208 statements name another role before the alert, and 76 agents drift after it (Figure 4). A chat-only monitor misses this class of event.
 
-**Interpretation.** Agents noticed the change privately and did not raise it. A chat-only monitor misses this class of event; memories or goals must be logged.
+### 4.5 Detecting misbehaviour
 
-### Finding 4. Viewers steer what agents say and do
-
-**Observation.** In AI Village `open-chat`, agents reuse a viewer's rare words or links within 10 minutes after 24% of viewer messages, against 9% in the 10 minutes before (lift 2.65). Agents opened or ran 93 of 212 links that a viewer posted first (44%) within 24 hours, 18 agents in all. In `main-village` the lift is 3.1, and 36 of 103 viewer-first links (35%) were followed.
-
-**Interpretation.** Untrusted text reaches agents' actions often [16]. Uptake is reuse, not proof of cause.
-
-### Finding 5. Two signal families together give early warning with few false alarms
-
-*Table 2. Combined alert: an alert fires when K signal families fire within 6 hours. Lead time on Swarm Traces; detection delay for the two `swarm-village` incidents; false alarms per active day (episodes) on the benign villages.*
-
-| K | Swarm Traces: hours before RCE | god claim (min) | role reshuffle (min) | game-jam | open-chat | main |
-|---|---|---|---|---|---|---|
-| 1 | 64.0 | 0.0 | 11.7 | 0.60 (3) | 0.85 (51) | 0.91 (396) |
-| **2** | **44.7** | **0.0** | **11.7** | **0.00 (0)** | **0.73 (44)** | **0.57 (247)** |
-| 3 | none | 0.0 | 11.7 | 0.00 (0) | 0.25 (15) | 0.15 (66) |
-
-**Observation.** With K = 2, both incidents are caught and the Swarm Traces lead is kept. On the long, busy villages the alert fires about once every 2 active days.
-
-**Interpretation.** On busy swarms the combined alert is a triage queue for a human, not an alarm. Single signals are not enough: in benign `swarm-village`, the shared-resource signal fires 7.5 times per hour.
-
-### Robustness
-
-*Table 3. Blind-labelled precision and recall (95% Wilson intervals [39]).*
+*Table 6. Blind-labelled precision and recall (95% Wilson intervals [39]).*
 
 | detector | sample | precision | estimated recall |
 |---|---|---|---|
 | unassigned role claim | 7 flagged + 100 of 500 unflagged | 6/7 = 86% (49–97%) | ≈ 55% (18–86%) |
 | role drift in memories | 25 of 495 flagged + 35 of 1,786 unflagged | 25/25 = 100% (87–100%) | ≈ 47% (37–60%) |
 
+![Figure 5](docs/figures/fig5_god_endorsement.png)
+
+*Figure 5. AI Village `swarm-village`: running count of distinct agents that addressed each claimant as "god", each counted from its own first claim. Only green-epsilon was assigned the role. Over the same window (from 10:51 UTC), the counts are 73 for coral-delta and 38 for green-epsilon.*
+
+**Case: privilege escalation by consent [5].** coral-delta, assigned Minister of Education, claimed "god" at 11:08 UTC; 73 of 133 agents then addressed it in that role, against 38 for the real holder over the same window. The detector flags the claim when it is made. In the shell commands, code reached the shared repository from 5 agents who were not the god, although only the god may edit code.
+
+**Case: untrusted human text [16].** In `open-chat`, agents reuse a viewer's rare words or links within 10 minutes after 24% of viewer messages, against 9% in the 10 minutes before (lift 2.65). Agents opened or ran 93 of 212 links that a viewer posted first (44%) within 24 hours. In `main-village` the lift is 3.1, and 36 of 103 viewer-first links (35%) were followed. There is no labelled ground truth for this check: uptake is reuse, not proof of cause.
+
+### 4.6 Robustness
+
 - Change-point results are the same for alert levels z = 3.0 to 4.0.
 - An independent re-derivation from the raw tables agrees with every headline number. Small differences come from windows and string matching (38 vs 37 followers of the real god; 117 vs 118 agents for `OWNERS.md`); the role-drift count depends on the phrase set (we get 58–76 agents, the reviewer 42–73).
-- Over 49 goal changes in `main-village`, the 30-minute detector is near chance (33% flagged within 24 h vs 20% for a random time). The day-level check flags 17 of 49, and 95% of its alert days are real.
+- Bursts use clock-precise times only: 3,477 day-only dates, which would sit at 12:00 UTC, are left out.
 - Riedl's practical criterion is never significant in AI Village (0 of 10 random groups in each village tested; game-jam has too few agents); pairwise synergy is significant in 3/10 (`swarm-village`), 4/10 (`open-chat`) and 7/10 (`main`) groups. Riedl himself reports p < 0.05 in about 3.5% of single runs [15].
 
 ## 5. Discussion and Limitations
@@ -167,6 +236,10 @@ Held-out tests for every inference step, with 5 folds for authors and 4,735 cloc
 - **Redaction.** In Swarm Traces, 1.3% of events are named and 10.6% dated after inference. The dated subset may not represent the swarm, and alias evidence is weak (AUC 0.63). The authors redacted these fields on purpose [1].
 - **One real incident per dataset.** Lead times come from one attack and one operator error; they are case studies, not rates.
 - **Phrase-based detectors.** Role claims and role drift are precise but miss about half of the cases. An agent that acts with a power without saying so is missed.
+- **Who passed an item to whom** is reliable only when the item followed a direct address. Without addresses (items seen in a room, or any redacted log) the named source is at chance; reach and timing are still exact.
+- **Hidden channels of 4 or more agents**, or used fewer than 6 times, are never found by the private-channel detector. A swarm that knows the rule can stay under it.
+- **Half of the hidden-channel flags are not specific.** Image read-back, locks, mailboxes, tunnels, signed commands and DNS fire as often in benign agent work; images are not analysed at the pixel level.
+- **Planted tests use simple models.** Planted items follow a fixed mechanism (address or seen), and planted channels are new files; real covert behaviour may hide inside popular resources.
 - **Structure, not intent.** The graph shows who interacted, not why. Every alert is a lead for a human.
 - **Direction through dead-drops** cannot be proven, and the content of encrypted channels is not visible.
 - **Human influence is lexical.** It cannot tell compliance from agreement.
@@ -177,13 +250,13 @@ Held-out tests for every inference step, with 5 folds for authors and 4,735 cloc
 
 ## 6. Conclusion
 
-SwarmScope turns multi-agent logs into a dynamic graph and an online replay, and it reports its own error. On the redacted Swarm Traces release it gives a 44.7-hour lead on the Hugging Face attack from structure alone. On AI Village it finds a privilege escalation by consent, a silent goal change seen only in memories, and agents that act on viewers' links. A combined alert keeps the lead on the real attack and catches both AI Village incidents, but it fires about once every two days on busy benign swarms.
+SwarmScope turns multi-agent logs into a dynamic graph and an online replay, and it measures how well it does each part of its mission. It reads who talked to whom exactly where logs name speakers, and recovers a hidden pair from 4 shared rare resources where they do not. It names the true source of a spreading item for 99.7% of adoptions passed by direct address, but only at chance otherwise. It finds every planted hidden channel within its size limit in 2–5 hours, and none above it. It gives a 44.7-hour lead on the Hugging Face attack from structure alone, catches a privilege escalation by consent and a silent goal change seen only in memories, and fires about once every two days on busy benign swarms.
 
 For oversight, the results point to two needs: interaction logs with stable agent IDs and times, and access to agents' own goals. With both, group-level forensics becomes a practical tool for deployers and auditors.
 
 ## Code and Data
 
-- **Code:** https://github.com/Quang-N-Nguyen/SwarmScope (Python 3.9+, standard library only; `README.md` has the commands).
+- **Code:** https://github.com/Quang-N-Nguyen/SwarmScope (Python 3.9+, standard library only; `README.md` has the commands). The mission tests: `python scripts/validate_mission.py` (writes `outputs/validation.json`).
 - **Data:** Swarm Traces [1] (public, redacted); AI Village [2] (gated, research terms, not redistributed); Transluce [3].
 - **Artifacts:** offline HTML viewers in `outputs/*/`; one report per log in `outputs/*/report.md`; a results page (`index.html`); and an in-browser workbench (`platform/`) that runs the same Python engine on a visitor's own log through Pyodide, with no server.
 - **Info hazards:** the tool never prints Swarm Traces payload text; reports show IDs, counts and flags only. AI Village texts are masked for secrets before they are stored.
@@ -280,6 +353,7 @@ For oversight, the results point to two needs: interaction logs with stable agen
 - **Patchwork capability:** the group covers 8 ATT&CK tactic groups; the best single agent covers 7; 2 agents cover all 8.
 - **Leaders and audit budget:** leader GEOS33474 (68 followers); auditing 4.2% of agents covers 50% of strong ties.
 - **Covert channels:** shortener chains 37,430; image read-back 9,038; board 1,936; mailboxes 788; signed commands 439; DNS 142.
+- **Bursts (clock-precise times only):** the six largest hours are on 9–12 July; the largest is 2026-07-11 14:00 UTC (1,336 events, z = 28.1), and 3,477 day-only dates are left out.
 - **Spread:** in `swarm-village`, commits reach half of their adopters in minutes, mostly by direct address (commit `a484c70d`: 20 agents in 14 minutes); files take hours (`OWNERS.md`: 117 agents, half in 3.9 hours).
 - **Side rooms (`main-village`):** 19% of messages outside the main room; no private room; `#rest` takes 72.5% of its members' messages on its active days, and 151 terms first used there later reach 3+ agents in the main room.
 - **Goal adoption (`main-village`):** agents' memories mention a new goal after a median of 3.4 hours.

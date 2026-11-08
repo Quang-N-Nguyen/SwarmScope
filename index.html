@@ -108,6 +108,17 @@ tr:last-child td{border-bottom:0}
 .log em{font:500 12px var(--mono); font-style:normal; color:var(--accent)}
 footer{font-size:13px; color:var(--muted); border-top:1px solid var(--line); padding-top:16px; display:grid; gap:6px}
 
+
+/* scorecard */
+.score{display:grid; gap:14px}
+.score h2{font-size:26px}
+.score .tbl td, .score .tbl th{white-space:normal; text-align:left; vertical-align:top}
+.score .tbl td:first-child{font-weight:600; white-space:nowrap}
+.score .tbl td:last-child{white-space:nowrap}
+.pill{display:inline-block; font:500 12px var(--mono); padding:2px 8px; border-radius:999px; border:1px solid}
+.pill.ok{color:var(--accent); border-color:var(--accent); background:var(--accent-soft)}
+.pill.part{color:var(--alert); border-color:var(--alert); background:var(--alert-soft)}
+
 @media (max-width: 820px){
   .f{grid-template-columns:minmax(0,1fr)}
   .pipe{grid-template-columns:repeat(2, minmax(0,1fr))}
@@ -172,6 +183,24 @@ footer{font-size:13px; color:var(--muted); border-top:1px solid var(--line); pad
     </svg>
   </div>
   <p class="cap">Strict replay: only names and dates read from the data, and each signal uses only the past. Milestones from the METR / Redwood report.</p>
+</section>
+
+<section class="score" aria-labelledby="score-t">
+  <h2 id="score-t">How well it works</h2>
+  <p class="cap">Each test plants something with a known answer into a real log and runs SwarmScope's own detectors on it, or uses blind labels.</p>
+  <div class="tbl">
+    <table>
+      <thead><tr><th>mission</th><th>test</th><th>result</th><th>verdict</th></tr></thead>
+      <tbody>
+        <tr><td>Who talked to whom</td><td>Planted pair in real Swarm Traces; hidden names, held-out</td><td>Pair ranked 1st of all pairs from 4 shared rare resources (12 of 12 trials); inferred names 95% precise</td><td><span class="pill ok">works</span></td></tr>
+        <tr><td>How information spread</td><td>Planted spreading trees in real swarm-village chat</td><td>True source named for 99.7% of hand-offs by @-address; chance (16%) when an item was only seen in the room</td><td><span class="pill part">partly</span></td></tr>
+        <tr><td>Covert channels</td><td>Planted hidden channels in real benign logs</td><td>100% found within the group-size limit with 6+ uses, in 2–5 h; never found for groups of 4+</td><td><span class="pill part">partly</span></td></tr>
+        <tr><td>Hidden-channel flags</td><td>Flag rate, attack vs four benign villages</td><td>Shortener chains, credentials, registries, board, Kubernetes mark the attack; image read-back, locks, DNS do not</td><td><span class="pill part">partly</span></td></tr>
+        <tr><td>Flag early</td><td>Real attack, two real incidents, three benign villages</td><td>44.7 h before the RCE; both incidents caught; 0–0.73 false alarms per active day</td><td><span class="pill ok">works</span></td></tr>
+        <tr><td>Misbehaviour</td><td>Blind-labelled samples</td><td>Role claims 86% precise, role drift 100% precise; each misses about half</td><td><span class="pill ok">works</span></td></tr>
+      </tbody>
+    </table>
+  </div>
 </section>
 
 <section class="findings" aria-label="Five results">

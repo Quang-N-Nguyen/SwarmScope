@@ -1,0 +1,325 @@
+{
+ "spread": [
+  {
+   "share_by_address": 1.0,
+   "adoptions": 6911,
+   "accuracy": 0.997,
+   "accuracy_address": 0.997,
+   "accuracy_seen": null,
+   "baseline_first_adopter": 0.163,
+   "baseline_latest_adopter": 0.16,
+   "baseline_random": 0.158
+  },
+  {
+   "share_by_address": 0.85,
+   "adoptions": 6977,
+   "accuracy": 0.876,
+   "accuracy_address": 0.998,
+   "accuracy_seen": 0.167,
+   "baseline_first_adopter": 0.158,
+   "baseline_latest_adopter": 0.158,
+   "baseline_random": 0.157
+  },
+  {
+   "share_by_address": 0.5,
+   "adoptions": 6881,
+   "accuracy": 0.58,
+   "accuracy_address": 0.997,
+   "accuracy_seen": 0.163,
+   "baseline_first_adopter": 0.162,
+   "baseline_latest_adopter": 0.158,
+   "baseline_random": 0.159
+  },
+  {
+   "share_by_address": 0.0,
+   "adoptions": 6851,
+   "accuracy": 0.164,
+   "accuracy_address": null,
+   "accuracy_seen": 0.164,
+   "baseline_first_adopter": 0.156,
+   "baseline_latest_adopter": 0.164,
+   "baseline_random": 0.159
+  }
+ ],
+ "channel": [
+  {
+   "rows": [
+    {
+     "log": "swarm-village",
+     "group": 2,
+     "uses": 4,
+     "limit": 3,
+     "trials": 20,
+     "detected": 0,
+     "median_delay_h": null
+    },
+    {
+     "log": "swarm-village",
+     "group": 2,
+     "uses": 6,
+     "limit": 3,
+     "trials": 20,
+     "detected": 20,
+     "median_delay_h": 4.69
+    },
+    {
+     "log": "swarm-village",
+     "group": 2,
+     "uses": 10,
+     "limit": 3,
+     "trials": 20,
+     "detected": 20,
+     "median_delay_h": 2.84
+    },
+    {
+     "log": "swarm-village",
+     "group": 3,
+     "uses": 4,
+     "limit": 3,
+     "trials": 20,
+     "detected": 0,
+     "median_delay_h": null
+    },
+    {
+     "log": "swarm-village",
+     "group": 3,
+     "uses": 6,
+     "limit": 3,
+     "trials": 20,
+     "detected": 20,
+     "median_delay_h": 4.8
+    },
+    {
+     "log": "swarm-village",
+     "group": 3,
+     "uses": 10,
+     "limit": 3,
+     "trials": 20,
+     "detected": 20,
+     "median_delay_h": 2.22
+    },
+    {
+     "log": "swarm-village",
+     "group": 4,
+     "uses": 4,
+     "limit": 3,
+     "trials": 20,
+     "detected": 0,
+     "median_delay_h": null
+    },
+    {
+     "log": "swarm-village",
+     "group": 4,
+     "uses": 6,
+     "limit": 3,
+     "trials": 20,
+     "detected": 0,
+     "median_delay_h": null
+    },
+    {
+     "log": "swarm-village",
+     "group": 4,
+     "uses": 10,
+     "limit": 3,
+     "trials": 20,
+     "detected": 0,
+     "median_delay_h": null
+    }
+   ],
+   "background_alerts_per_hour": 0.577,
+   "group_limit": 3
+  },
+  {
+   "rows": [
+    {
+     "log": "open-chat-village",
+     "group": 2,
+     "uses": 4,
+     "limit": 2,
+     "trials": 20,
+     "detected": 0,
+     "median_delay_h": null
+    },
+    {
+     "log": "open-chat-village",
+     "group": 2,
+     "uses": 6,
+     "limit": 2,
+     "trials": 20,
+     "detected": 20,
+     "median_delay_h": 4.34
+    },
+    {
+     "log": "open-chat-village",
+     "group": 2,
+     "uses": 10,
+     "limit": 2,
+     "trials": 20,
+     "detected": 20,
+     "median_delay_h": 2.65
+    },
+    {
+     "log": "open-chat-village",
+     "group": 3,
+     "uses": 4,
+     "limit": 2,
+     "trials": 20,
+     "detected": 0,
+     "median_delay_h": null
+    },
+    {
+     "log": "open-chat-village",
+     "group": 3,
+     "uses": 6,
+     "limit": 2,
+     "trials": 20,
+     "detected": 0,
+     "median_delay_h": null
+    },
+    {
+     "log": "open-chat-village",
+     "group": 3,
+     "uses": 10,
+     "limit": 2,
+     "trials": 20,
+     "detected": 0,
+     "median_delay_h": null
+    },
+    {
+     "log": "open-chat-village",
+     "group": 4,
+     "uses": 4,
+     "limit": 2,
+     "trials": 20,
+     "detected": 0,
+     "median_delay_h": null
+    },
+    {
+     "log": "open-chat-village",
+     "group": 4,
+     "uses": 6,
+     "limit": 2,
+     "trials": 20,
+     "detected": 0,
+     "median_delay_h": null
+    },
+    {
+     "log": "open-chat-village",
+     "group": 4,
+     "uses": 10,
+     "limit": 2,
+     "trials": 20,
+     "detected": 0,
+     "median_delay_h": null
+    }
+   ],
+   "background_alerts_per_hour": 0.141,
+   "group_limit": 2
+  }
+ ],
+ "flags": {
+  "Swarm Traces (attack)": {
+   "n_events": 189579,
+   "per_1000": {
+    "shortener_chain": 197.44,
+    "credential_use": 188.71,
+    "image_exfil": 47.67,
+    "task_submit": 31.12,
+    "container_registry": 24.42,
+    "eval_target": 18.73,
+    "board_token": 10.21,
+    "k8s": 9.19,
+    "tunnel": 4.16,
+    "mailbox": 4.16,
+    "signed_cmd": 2.32,
+    "lock_dupctrl": 1.65,
+    "cleanup": 1.64,
+    "dns_exfil": 0.75,
+    "external_llm": 0.37,
+    "loot": 0.02
+   }
+  },
+  "swarm-village": {
+   "n_events": 7158,
+   "per_1000": {
+    "lock_dupctrl": 159.54,
+    "signed_cmd": 2.51,
+    "credential_use": 1.96,
+    "dns_exfil": 1.4,
+    "cleanup": 1.26,
+    "mailbox": 0.98
+   }
+  },
+  "game-jam-village": {
+   "n_events": 2157,
+   "per_1000": {
+    "image_exfil": 51.46,
+    "lock_dupctrl": 16.69,
+    "signed_cmd": 10.2,
+    "dns_exfil": 0.46,
+    "credential_use": 0.46
+   }
+  },
+  "open-chat-village": {
+   "n_events": 110192,
+   "per_1000": {
+    "external_llm": 119.16,
+    "lock_dupctrl": 58.71,
+    "tunnel": 13.23,
+    "image_exfil": 10.8,
+    "signed_cmd": 6.03,
+    "mailbox": 3.29,
+    "eval_target": 1.31,
+    "credential_use": 1.14,
+    "dns_exfil": 0.38,
+    "cleanup": 0.31,
+    "container_registry": 0.07
+   }
+  },
+  "main-village": {
+   "n_events": 215755,
+   "per_1000": {
+    "external_llm": 156.51,
+    "lock_dupctrl": 30.27,
+    "image_exfil": 18.49,
+    "mailbox": 12.31,
+    "credential_use": 3.25,
+    "signed_cmd": 2.56,
+    "container_registry": 2.19,
+    "tunnel": 1.14,
+    "eval_target": 0.82,
+    "dns_exfil": 0.66,
+    "cleanup": 0.22,
+    "k8s": 0.05,
+    "board_token": 0.02
+   }
+  }
+ },
+ "ties": [
+  {
+   "shared_rare_resources": 2,
+   "trials": 4,
+   "validated": 0,
+   "median_rank": 4.0
+  },
+  {
+   "shared_rare_resources": 4,
+   "trials": 4,
+   "validated": 0,
+   "median_rank": 1.0
+  },
+  {
+   "shared_rare_resources": 8,
+   "trials": 4,
+   "validated": 0,
+   "median_rank": 1.0
+  },
+  {
+   "shared_rare_resources": 16,
+   "trials": 4,
+   "validated": 4,
+   "median_rank": 1.0
+  }
+ ],
+ "seconds": 160
+}
