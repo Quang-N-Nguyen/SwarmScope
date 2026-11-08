@@ -1,7 +1,7 @@
 # SwarmScope: Reconstructing Who Talked to Whom in Multi-Agent Logs, as a Dynamic Graph for Forensics and Early Warning
 
 **Apart Research Swarm Alignment Hackathon, Track 4: Multi-Agent Oversight and Control.**
-Code: https://github.com/Quang-N-Nguyen/Apart-Research-Swarm-2026
+Code: https://github.com/Quang-N-Nguyen/SwarmScope
 
 ## Abstract
 
@@ -183,7 +183,7 @@ For oversight, the results point to two needs: interaction logs with stable agen
 
 ## Code and Data
 
-- **Code:** https://github.com/Quang-N-Nguyen/Apart-Research-Swarm-2026 (Python 3.9+, standard library only; `README.md` has the commands).
+- **Code:** https://github.com/Quang-N-Nguyen/SwarmScope (Python 3.9+, standard library only; `README.md` has the commands).
 - **Data:** Swarm Traces [1] (public, redacted); AI Village [2] (gated, research terms, not redistributed); Transluce [3].
 - **Artifacts:** offline HTML viewers in `outputs/*/`; one report per log in `outputs/*/report.md`.
 - **Info hazards:** the tool never prints Swarm Traces payload text; reports show IDs, counts and flags only. AI Village texts are masked for secrets before they are stored.
