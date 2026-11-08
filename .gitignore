@@ -3,10 +3,30 @@ __pycache__/
 *.pyc
 .pytest_cache/
 
-# AI Village data is gated (research terms): never commit it
+# ---- Raw data: never commit ----------------------------------------------
+# AI Village is gated (research terms, no redistribution). Swarm Traces and
+# Transluce are public but large; download them with the README commands.
 data/
+# Guards in case raw AI Village files are saved outside data/ (e.g. --out elsewhere)
+**/ai-village/
+**/.cache/huggingface/
+chat_messages*.jsonl*
+chat_rooms*.jsonl*
+agent_memories*.jsonl*
+agent_goals*.jsonl*
+computer_use_sessions*.jsonl*
+computer_use_turns*.jsonl*
+village_goals*.jsonl*
+villages*.jsonl*
+events*.jsonl.gz
+agents*.jsonl.gz
+*.parquet
 
-# findings.json is large (~1.6 MB) and can be regenerated; keep report + viewer
+# ---- Our analysis: committed and shareable --------------------------------
+# outputs/*/report.md, the world-map and graph viewers, flag_early.*,
+# validation.json, ai_village_comparison.md and docs/figures/ hold IDs, counts,
+# flags and short operator headlines, not the raw data.
+# findings.json is large (~1.6 MB) and can be regenerated.
 outputs/**/findings.json
 
 # Built platform (Pyodide runtime, copies of viewers): python platform/build_platform.py
