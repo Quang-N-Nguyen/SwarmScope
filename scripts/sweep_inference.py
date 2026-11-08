@@ -2,7 +2,7 @@
 
 Run from the repo root:
 
-    python scripts/sweep_inference.py Swarm-Traces-Data/redacted.jsonl.gz
+    python scripts/sweep_inference.py data/swarm-traces/redacted.jsonl.gz
 
 For each preset in swarmscope.report.PRESETS it prints:
   * attribution: held-out precision and coverage, and the share of all events
@@ -42,4 +42,4 @@ def main(path: str) -> None:
 
 
 if __name__ == "__main__":
-    main(sys.argv[1] if len(sys.argv) > 1 else "Swarm-Traces-Data/redacted.jsonl.gz")
+    main(sys.argv[1] if len(sys.argv) > 1 else "data/swarm-traces/redacted.jsonl.gz")

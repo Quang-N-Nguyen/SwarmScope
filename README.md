@@ -13,10 +13,11 @@ SwarmScope reads a multi-agent log and rebuilds who talked to whom, how informat
 
 ```bash
 # Swarm Traces (Python 3.9+, standard library only, about 1 minute)
-python -m swarmscope.cli analyze Swarm-Traces-Data/redacted.jsonl.gz \
+mkdir -p data/swarm-traces && curl -L https://swarmtraces.org/data/final/redacted.jsonl.gz -o data/swarm-traces/redacted.jsonl.gz
+python -m swarmscope.cli analyze data/swarm-traces/redacted.jsonl.gz \
     --format swarm_traces --out outputs/swarm_traces --inference balanced
 #   --inference: off | precise | balanced | broad
-python scripts/sweep_inference.py Swarm-Traces-Data/redacted.jsonl.gz   # accuracy per preset
+python scripts/sweep_inference.py data/swarm-traces/redacted.jsonl.gz   # accuracy per preset
 
 # AI Village (gated: accept the terms on huggingface.co, then log in)
 pip install huggingface_hub && huggingface-cli login
@@ -61,6 +62,6 @@ outputs/<log>/                      report.md + viewer HTML (findings.json is re
 
 ## Data
 
-- **Swarm Traces** ([swarmtraces.org](https://swarmtraces.org/)): redacted by its authors. The tool never prints payload text.
+- **Swarm Traces** ([swarmtraces.org](https://swarmtraces.org/)): redacted by its authors; download it into `data/swarm-traces/` (not committed). The tool never prints payload text.
 - **AI Village** ([dataset](https://huggingface.co/datasets/aidigestorg/ai-village)): research use only under `ai-village-research-terms`; no re-identification; cite AI Digest. Not committed.
 - **Transluce** ([agent activity](https://transluce.org/agent-activity)): public report metadata; no agent field.
