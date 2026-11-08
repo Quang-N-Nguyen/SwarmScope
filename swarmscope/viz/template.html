@@ -99,6 +99,9 @@
   .row.seg .btn{padding:5px 9px;font-size:12.5px}
   #detail .grid{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;margin-top:4px}
   #detail .grid div:nth-child(odd){color:var(--muted)}
+  #detail .trail{margin-top:4px;max-height:260px;overflow:auto;border-top:1px solid var(--line)}
+  #detail .trail-row{padding:3px 0;border-bottom:1px solid var(--line);font-size:12px;line-height:1.35;word-break:break-all}
+  #detail .trail-row.inf{opacity:.7;border-left:2px dashed var(--muted);padding-left:5px}
   .legend-item .ln{width:18px;height:0;border-top:2px solid var(--muted)}
   .legend-item .ln.dash{border-top-style:dashed}
   .kpi-s{font:12px var(--f-data);color:var(--muted);margin-top:2px}
@@ -169,7 +172,7 @@
     <div class="sec" id="follow-sec" hidden>
       <h2>Follow an item</h2>
       <select id="follow" aria-label="Item to follow"><option value="">— none —</option></select>
-      <div class="hint" id="follow-hint">Pick a file, commit, coined term or role claim. Arrows show who probably passed it to whom, and appear when each agent adopts it. Press play.</div>
+      <div class="hint" id="follow-hint">Pick an item (a credential or dead-drop on redacted logs; a file, commit, coined term or role claim on named logs). Arrows show who probably passed it to whom, and appear when each agent adopts it. Press play.</div>
     </div>
 
     <div class="sec">
@@ -209,7 +212,7 @@
 
     <div class="sec">
       <h2>Selected node</h2>
-      <div id="detail"><span class="tiny">Click a node to inspect it.</span></div>
+      <div id="detail"><span class="tiny">Click a node to inspect it. Stop the replay at any moment and click an agent to see what it had done by then.</span></div>
     </div>
   </aside>
 
@@ -410,14 +413,17 @@ function draw(){
       const dx=b.x-a.x, dy=b.y-a.y, L=Math.hypot(dx,dy)||1, r=sizeOf(b)+2, ex=b.x-dx/L*r, ey=b.y-dy/L*r;
       const fresh = t-e.ts < (hi-lo)*0.02;
       ctx.globalAlpha = fresh ? 1 : 0.6;
-      ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(ex,ey); ctx.stroke();
+      ctx.setLineDash(e.inf ? [5/transform.k,4/transform.k] : []);
+      ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(ex,ey); ctx.stroke(); ctx.setLineDash([]);
       const h=6/transform.k, an=Math.atan2(dy,dx);
       ctx.beginPath(); ctx.moveTo(ex,ey); ctx.lineTo(ex-h*Math.cos(an-0.45),ey-h*Math.sin(an-0.45)); ctx.lineTo(ex-h*Math.cos(an+0.45),ey-h*Math.sin(an+0.45)); ctx.closePath(); ctx.fill();
     }
     ctx.globalAlpha=1;
     const fh=document.getElementById('follow-hint');
     fh.textContent = `${follow.kind} · ${adopted.size} of ${follow.reach} agents so far (${fmtTime(Math.min(t,hi))}). `
-      + (follow.kind==='claim' ? 'Arrows: an agent addresses the claimant in that role.' : 'Arrows: probable source → adopter (the earlier user who last @-addressed them, else the latest earlier user).');
+      + (follow.kind==='claim' ? 'Arrows: an agent addresses the claimant in that role.'
+         : (follow.kind==='credential'||follow.kind==='dead-drop') ? 'Arrows: earlier user → next user of the same item (latest earlier user; dashed = the adopter was named by inference). A dead-drop hides direction, so this is an order, not a proof.'
+         : 'Arrows: probable source → adopter (the earlier user who last @-addressed them, else the latest earlier user).');
   }
   for(const n of activeNodes()){
     if(!nodeVisible(n)) continue; visN++;
@@ -475,7 +481,25 @@ function renderDetail(n){
   let h=`<div class="big">${esc(n.lab)}</div><div class="grid">`+rows.map(([k,v])=>`<div>${esc(k)}</div><div>${esc(v)}</div>`).join('')+'</div>';
   if((n.tac||[]).length) h+=`<div style="margin-top:6px"><span class="k">tactics</span><br>${n.tac.map(m=>`<span class="pill">${esc(m)}</span>`).join('')}</div>`;
   if((n.mech||[]).length) h+=`<div style="margin-top:6px"><span class="k">top mechanisms</span><br>${n.mech.map(m=>`<span class="pill">${esc(m)}</span>`).join('')}</div>`;
+  h+=trailHtml(n);
   el.innerHTML=h;
+}
+// "What it did": the agent's events up to the current moment of the replay,
+// newest first. Rows are [ts, pos, kind, target, recipients, flags, inferred].
+const TRAIL_SHOW = 12;
+function trailHtml(n){
+  if(n.ty!=='agent' || !(n.ev||[]).length) return '';
+  const upTo = n.ev.filter(r => axis==='clock' ? (r[0]!=null && r[0]<=t) : r[1]<=t);
+  const sampled = n.n_ev > n.ev.length;
+  const head = `<div style="margin-top:8px"><span class="k">what it did</span> <span class="tiny">· ${upTo.length}${sampled?` of a sample of ${n.ev.length}`:''} events up to ${axis==='clock'?fmtTime(t):'this point'}${sampled?` (${n.n_ev.toLocaleString()} in all)`:''}</span></div>`;
+  if(!upTo.length) return head + `<div class="tiny">${axis==='clock' ? 'Nothing dated yet at this moment.' : 'Nothing yet at this point.'}</div>`;
+  const rows = upTo.slice(-TRAIL_SHOW).reverse().map(r => {
+    const when = r[0]!=null ? fmtTime(r[0]).slice(5,16) : `#${r[1]}`;
+    const to = (r[4]||[]).length ? ` → ${r[4].join(', ')}` : '';
+    const flags = (r[5]||[]).slice(0,3).map(f=>`<span class="pill">${esc(f)}</span>`).join('');
+    return `<div class="trail-row${r[6]?' inf':''}"><span class="tiny">${esc(when)}</span> <b>${esc(r[2])}</b>${r[3]?' · '+esc(r[3]):''}${esc(to)} ${flags}</div>`;
+  }).join('');
+  return head + `<div class="trail">${rows}</div>` + (upTo.length>TRAIL_SHOW ? `<div class="tiny">last ${TRAIL_SHOW} shown</div>` : '');
 }
 
 // ---------- legend + mechanism list
@@ -596,6 +620,7 @@ function setT(v){
   scrub.value=Math.round(f*1000); prog.style.width=(f*100)+'%';
   tread.textContent = axis==='clock' ? fmtTime(t) : `position ${Math.round(t).toLocaleString()} / ${MAXPOS.toLocaleString()}`;
   draw();
+  if(selected && selected.ty==='agent') renderDetail(selected);
 }
 scrub.addEventListener('input',()=>setT(lo+scrub.value/1000*(hi-lo)));
 document.getElementById('speed').addEventListener('change',e=>speed=+e.target.value);
@@ -628,6 +653,7 @@ document.getElementById('rg-week').addEventListener('click',()=>{ range='week'; 
 document.getElementById('rg-all').addEventListener('click',()=>{ range='all'; applyRange(); });
 // ---------- follow an item (transmission trees from the diffusion / authority detectors)
 const CASC = DATA.cascades || [];
+const FOLLOW_DEFAULT = document.getElementById('follow-hint').textContent;
 if(CASC.length && HAS_CLOCK){
   document.getElementById('follow-sec').hidden=false;
   const sel=document.getElementById('follow');
@@ -638,7 +664,7 @@ if(CASC.length && HAS_CLOCK){
       if(axis!=='clock'){ axis='clock'; applyAxis(); }
       if(follow.first_ts<lo || follow.first_ts>hi){ range='all'; applyRange(); }
       setT(follow.first_ts);
-    } else { document.getElementById('follow-hint').textContent='Pick a file, commit, coined term or role claim. Arrows show who probably passed it to whom, and appear when each agent adopts it. Press play.'; draw(); }
+    } else { document.getElementById('follow-hint').textContent=FOLLOW_DEFAULT; draw(); }
   });
 }
 if(!HAS_CLOCK) document.getElementById('ax-clock').disabled=true;

@@ -789,7 +789,9 @@ def to_markdown(log: EventLog, f: dict) -> str:
                  "flags, so this checks the ranking against an independent signal.\n")
     bu = res.get("bursts", {})
     if bu.get("bursts"):
-        L.append("**Bursts** (hours far above the mean, real clock):\n")
+        skipped = bu.get("day_dated_skipped") or 0
+        L.append("**Bursts** (hours far above the mean, real clock; clock-precise times only"
+                 + (f", {skipped:,} day-only dates left out" if skipped else "") + "):\n")
         L.append(_md_table(["hour", "events", "z", "top mechanisms"],
                            [(b["hour"], b["events"], b["z"], ", ".join(f"{m} {n}" for m, n in b["top_mechanisms"]))
                             for b in bu["bursts"][:6]]))

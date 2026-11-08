@@ -416,30 +416,48 @@ def cascades(log: EventLog, communities: Optional[Dict[str, int]] = None,
     For each credential or dead-drop dataset: the first agent, how many agents
     it reached, hours from first to last use, hours until half of those agents
     had used it, and how many agent communities it reached.
+
+    Each row also carries a transmission tree for the viewer: ``times`` is the
+    first-use time of every agent in order, and ``tree`` lists one
+    ``(parent, adopter)`` pair per later agent, where the parent is the latest
+    earlier user (a dead-drop shows no address, so this is the best guess, as
+    in the fallback rule of :mod:`diffusion`). ``inferred`` says, per adopter,
+    whether its name was inferred rather than read from the data.
+
+    Example: A uses credential 7 at 10:00, B at 10:05, C at 10:30 ->
+    ``tree = [("A", "B"), ("B", "C")]``, ``times = [10:00, 10:05, 10:30]``.
     """
-    touches: Dict[str, List[Tuple[float, str]]] = defaultdict(list)
+    touches: Dict[str, List[Tuple[float, str, bool]]] = defaultdict(list)
     for e in log.timed_events(include_inferred=True):
         who = e.who(use_inferred)
         if not who:
             continue
+        inferred = e.actor is None
         for rt in ref_types:
             for rid in e.ref_list(rt):
-                touches[f"{rt}:{rid}"].append((e.ts, who))
+                touches[f"{rt}:{rid}"].append((e.ts, who, inferred))
     rows = []
     for item, lst in touches.items():
         firsts: Dict[str, float] = {}
-        for t, a in sorted(lst):
-            firsts.setdefault(a, t)
+        first_inf: Dict[str, bool] = {}
+        for t, a, inf in sorted(lst, key=lambda x: (x[0], x[1])):
+            if a not in firsts:
+                firsts[a] = t
+                first_inf[a] = inf
         if len(firsts) < 2:
             continue
-        times = sorted(firsts.values())
+        order = sorted(firsts, key=lambda a: (firsts[a], a))
+        times = [firsts[a] for a in order]
         t0 = times[0]
         half = times[(len(times) - 1) // 2]
         comms = {communities.get(f"agent:{a}") for a in firsts} if communities else set()
-        rows.append(dict(item=item, origin=min(firsts, key=firsts.get), agents=len(firsts),
+        rows.append(dict(item=item, origin=order[0], agents=len(firsts),
                          span_hours=round((times[-1] - t0) / 3600, 1),
                          hours_to_half=round((half - t0) / 3600, 1),
-                         communities=len(comms - {None}) if comms else None))
+                         communities=len(comms - {None}) if comms else None,
+                         times=times,
+                         tree=[(order[i - 1], order[i]) for i in range(1, len(order))],
+                         inferred=[first_inf[a] for a in order]))
     rows.sort(key=lambda r: (-r["agents"], r["span_hours"]))
     return rows[:top]
 
@@ -448,17 +466,27 @@ def cascades(log: EventLog, communities: Optional[Dict[str, int]] = None,
 # 7. Bursts on the real clock
 # --------------------------------------------------------------------------
 def bursts(log: EventLog, z: float = 3.0, top: int = 10) -> dict:
-    """Hours whose event count is ``z`` standard deviations above the mean."""
+    """Hours whose event count is ``z`` standard deviations above the mean.
+
+    Only clock-precise times count. A date with no time of day is stored as
+    12:00 UTC, so hundreds of day-dated events would otherwise pile up into one
+    fake "burst" at noon. An inferred time that sits exactly on 12:00:00 is
+    treated the same way, because it was most likely copied from such a date.
+    """
     hours: Counter = Counter()
     mech: Dict[int, Counter] = defaultdict(Counter)
+    skipped = 0
     for e in log.timed_events(include_inferred=True):
+        if not clock_precise(e):
+            skipped += 1
+            continue
         h = int(e.ts // 3600)
         hours[h] += 1
         for f in _SUSPICIOUS:
             if e.has(f):
                 mech[h][f] += 1
     if len(hours) < 3:
-        return dict(n_hours=len(hours), bursts=[])
+        return dict(n_hours=len(hours), bursts=[], day_dated_skipped=skipped)
     lo, hi = min(hours), max(hours)
     series = [hours.get(h, 0) for h in range(lo, hi + 1)]
     mean = sum(series) / len(series)
@@ -472,7 +500,17 @@ def bursts(log: EventLog, z: float = 3.0, top: int = 10) -> dict:
                              events=c, z=round((c - mean) / sd, 1),
                              top_mechanisms=mech[h].most_common(3)))
     rows.sort(key=lambda r: -r["z"])
-    return dict(n_hours=len(series), mean_per_hour=round(mean, 2), bursts=rows[:top])
+    return dict(n_hours=len(series), mean_per_hour=round(mean, 2), bursts=rows[:top],
+                day_dated_skipped=skipped)
+
+
+def clock_precise(e) -> bool:
+    """True when the event's time has a time of day, not only a date."""
+    if e.ts is None or e.ts_precision == "day":
+        return False
+    if e.ts_precision == "inferred" and e.ts % 86400 == 43200:
+        return False
+    return True
 
 
 # --------------------------------------------------------------------------

@@ -49,15 +49,15 @@ Swarms of AI agents coordinate through shared files, rooms and resources, and ex
 
 ### 3.2 Features
 
-- **Dynamic graph viewer.** Play the log forward on a real clock or in discovery order; activity, conversation and coordination views; inferred edges drawn dashed; milestones on the timeline (Figure 2).
-- **Follow an item.** Replays one file, commit, coined term or role claim from agent to agent, with an arrow at each adoption [34].
+- **Dynamic graph viewer.** Play the log forward on a real clock or in discovery order; activity, conversation and coordination views; inferred edges drawn dashed; milestones on the timeline (Figure 2). Stop at any moment and click an agent to see what it had done by then (its events, resources and mechanism flags, never payload text).
+- **Follow an item.** Replays one item from agent to agent, with an arrow at each adoption [34]: a file, commit, coined term or role claim on named logs; a credential or dead-drop dataset on redacted logs (each arrow goes from the latest earlier user, dashed when the adopter was named by inference).
 - **Forensics charts.** All detectors on one clock (Figures 3–5).
 - **Inference of redacted fields.** Label propagation over rare shared identifiers [21, 22], weighted-median dating over linked events [25], and alias scoring on personal identifiers [27].
 - **Covert-channel inventory.** Link shorteners, image read-back, board, mailboxes, signed commands and DNS, mapped to ATT&CK [44].
 - **Early-warning replay.** Private channel, board, chat change point, unassigned role claim, role drift and rule break; a combined alert fires when K signal families fire within 6 hours.
 - **Authority and belief checks.** Endorsement cascades for claimed roles; role drift in memories; rule breaks in shell commands.
 - **Side rooms, human influence and emergence.** Private rooms and leaks into the main room; viewer text and links reused by agents; Riedl's practical criterion and pairwise synergy [15, 38, 41].
-- **Researcher metrics.** Statistically validated ties [28–31], ATT&CK set cover [6], leaders and brokers [18, 32], and the audit-budget curve [12].
+- **Researcher metrics.** Statistically validated ties [28–31], ATT&CK set cover [6], leaders and brokers [18, 32], the audit-budget curve [12], and hourly bursts (clock-precise times only: a date with no time of day sits at 12:00 UTC and would otherwise look like a noon burst).
 
 ### 3.3 Data
 
