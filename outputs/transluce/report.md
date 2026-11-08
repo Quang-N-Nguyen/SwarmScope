@@ -52,7 +52,7 @@ The 15 strongest:
 **Day-level check** (for long logs). Each active day (at least 50 agent messages) is compared with the 3 active days before it; alert at z >= 2.5. 6 alert days out of 66 active days.
 There are no milestones to score it against.
 
-**False-alarm load of the Swarm Traces signals.** No covert channel is known in this village, so each firing is at best a lead for an investigator:
+**Swarm Traces signals on this log.** Each firing is a lead for an investigator, not a confirmed channel:
 
 | signal | firings | per hour |
 | --- | --- | --- |

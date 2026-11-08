@@ -1,0 +1,1212 @@
+<title>__TITLE__</title>
+<style>
+  /* SwarmScope world viewer. A blueprint page: grey-blue paper with a faint hex
+     lattice, islands of hex plots on hatched plinths, one plot per agent.
+     One selection blue (exchanges, selection, notes), one activity orange
+     (who is busy now, items being followed); everything else is ink. */
+  :root{
+    --page:#e9edf1; --paper:#ffffff; --ink:#1f2328; --ink2:#4b5563; --muted:#6b7079; --faint:#a3a8b1;
+    --rule:#d5d9e0; --frame:#9aa1ab; --shade:#eef1f5; --wash:rgba(75,85,99,.07);
+    --select:#2f4fd8; --select-line:#8da0ec; --select-wash:#eef1fd; --note:#3a56d6;
+    --act:#d9731a; --act-wash:#fbe9d8; --grid:rgba(64,92,128,.13);
+    --f-sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+    --f-mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+    /* names the forensics charts use */
+    --panel:var(--paper); --line:var(--rule); --alert:#c4361d; --accent:var(--select); --accent2:var(--act);
+    --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a;
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){
+      --page:#111316; --paper:#1b1d21; --ink:#e8e7e3; --ink2:#b9bec6; --muted:#9a9fa6; --faint:#5c626b;
+      --rule:#33383f; --frame:#6f757e; --shade:#24272c; --wash:rgba(255,255,255,.06);
+      --select:#8098ff; --select-line:#4d61c8; --select-wash:#1f2642; --note:#3d55c9;
+      --act:#f0a05c; --act-wash:#3a2a1c; --grid:rgba(255,255,255,.06);
+      --alert:#ff6b5a; --s1:#3987e5; --s2:#d95926; --s3:#199e70; color-scheme:dark;
+    }
+  }
+  :root[data-theme="dark"]{
+    --page:#111316; --paper:#1b1d21; --ink:#e8e7e3; --ink2:#b9bec6; --muted:#9a9fa6; --faint:#5c626b;
+    --rule:#33383f; --frame:#6f757e; --shade:#24272c; --wash:rgba(255,255,255,.06);
+    --select:#8098ff; --select-line:#4d61c8; --select-wash:#1f2642; --note:#3d55c9;
+    --act:#f0a05c; --act-wash:#3a2a1c; --grid:rgba(255,255,255,.06);
+    --alert:#ff6b5a; --s1:#3987e5; --s2:#d95926; --s3:#199e70; color-scheme:dark;
+  }
+  *{box-sizing:border-box}
+  [hidden]{display:none!important}
+  html,body{height:100%}
+  body{margin:0;background:var(--page);color:var(--ink);font:14px/1.45 var(--f-sans);overflow:hidden;-webkit-font-smoothing:antialiased}
+  button,input,select{font:inherit;color:inherit}
+  :focus-visible{outline:2px solid var(--select);outline-offset:2px}
+  #app{position:fixed;inset:0}
+  #map{position:absolute;inset:0}
+  #world{display:block;width:100%;height:100%;cursor:grab;touch-action:none}
+  #world.grabbing{cursor:grabbing}
+
+  /* framed cards sitting on a hatched plinth */
+  .card{background:var(--paper);border:1.25px solid var(--frame);border-radius:7px;position:relative}
+  .plinth{border-bottom-left-radius:0;border-bottom-right-radius:0}
+  .plinth::after{content:"";position:absolute;left:-1.25px;right:-1.25px;top:100%;height:7px;border:1.25px solid var(--frame);
+    border-top:0;border-radius:0 0 7px 7px;pointer-events:none;
+    background:repeating-linear-gradient(135deg,var(--frame) 0 .8px,var(--paper) .8px 4px)}
+
+  /* left icon rail */
+  #rail{position:absolute;left:14px;top:14px;width:54px;display:flex;flex-direction:column;align-items:center;gap:5px;padding:9px 0;z-index:12}
+  .rbtn{width:40px;height:40px;border-radius:7px;border:1.25px solid transparent;background:none;display:grid;place-items:center;cursor:pointer;color:var(--ink2);padding:0}
+  .rbtn:hover{background:var(--wash)}
+  .rbtn.on{border-color:var(--select);background:var(--select-wash);color:var(--select)}
+  .rbtn[hidden]{display:none}
+  .ico{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+  .rsep{width:26px;height:1px;background:var(--rule);margin:3px 0}
+
+  /* the panel */
+  #panel{position:absolute;left:80px;top:14px;bottom:22px;width:370px;display:flex;flex-direction:column;z-index:11}
+  #panel.closed{display:none}
+  .ph{padding:16px 18px 12px;border-bottom:1px solid var(--rule)}
+  .ph-top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .eyebrow{font:600 13px/1 var(--f-mono);letter-spacing:.24em;text-transform:uppercase}
+  .ptitle{font:600 17.5px/1.3 var(--f-sans);margin:12px 0 12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .xbtn{width:30px;height:30px;border:1.25px solid var(--rule);border-radius:6px;background:none;cursor:pointer;display:grid;place-items:center;color:var(--ink2);padding:0}
+  .xbtn .ico{width:17px;height:17px}
+  .tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+  .tab{border:1.25px solid var(--frame);background:var(--paper);border-radius:5px;padding:6px 8px;cursor:pointer;color:var(--ink2);font-size:14.5px}
+  .tab.on{border-color:var(--select);color:var(--select);background:var(--select-wash)}
+  .pb{flex:1;overflow-y:auto;padding:16px 18px 20px;scrollbar-width:thin}
+  .pf{border-top:1px solid var(--rule);padding:10px 12px}
+  .view[hidden]{display:none}
+  .lead{font-size:15px;line-height:1.6;color:var(--ink2);margin:0 0 18px}
+  .lead b{color:var(--ink);font-weight:600}
+  .rule-h{display:flex;align-items:center;gap:10px;font:500 12px/1.2 var(--f-mono);letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin:20px 0 10px}
+  .rule-h::after{content:"";flex:1;height:1px;background:var(--rule)}
+  .rule-h:first-child{margin-top:0}
+  .tags{display:flex;flex-wrap:wrap;gap:6px}
+  .tag{font:13px/1.3 var(--f-mono);border:1.25px solid var(--rule);border-radius:4px;padding:3px 8px;background:var(--paper);cursor:pointer;color:var(--ink)}
+  .tag:hover{border-color:var(--select-line)}
+  .tag.on{border-color:var(--select);color:var(--select);background:var(--select-wash)}
+  .muted{color:var(--muted)} .mono{font-family:var(--f-mono)}
+  .small{font-size:12.5px;line-height:1.45}
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);margin:0 0 6px}
+  .stats>div{padding:10px 12px 9px}
+  .stats>div+div{border-left:1.25px solid var(--frame)}
+  .stat-n{font:500 21px/1.1 var(--f-mono);font-variant-numeric:tabular-nums}
+  .stat-l{font:500 10.5px/1.2 var(--f-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-top:5px}
+  .finding{margin:0 0 12px}
+  .finding .k{font:500 19px/1.2 var(--f-mono);color:var(--ink)}
+  .finding .t{font-size:13.5px;line-height:1.5;color:var(--ink2);margin-top:2px}
+  .busy-line{font-size:14.5px;line-height:1.55;color:var(--ink2);margin-bottom:8px}
+  .busy-line b{color:var(--ink);font-family:var(--f-mono);font-weight:600}
+  .feed{list-style:none;margin:0;padding:0}
+  .feed li{display:grid;grid-template-columns:18px 1fr auto;gap:2px 8px;padding:7px 0;align-items:start;cursor:pointer}
+  .feed li+li{border-top:1px dashed var(--rule)}
+  .feed .ico{width:15px;height:15px;margin-top:2px;color:var(--muted)}
+  .feed .who{font:13.5px/1.35 var(--f-mono);color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .feed .who em{font-style:normal;color:var(--select)}
+  .feed .when{font:12px var(--f-mono);color:var(--muted);text-align:right}
+  .feed .what{grid-column:2/4;font-size:13px;color:var(--muted)}
+  .feed li.future{opacity:.42}
+  .feed li.now .when{color:var(--select)}
+  .seg{display:inline-flex;border:1.25px solid var(--frame);border-radius:6px;overflow:hidden}
+  .seg button{border:0;background:var(--paper);padding:6px 12px;cursor:pointer;color:var(--ink2);font-size:13.5px}
+  .seg button+button{border-left:1.25px solid var(--frame)}
+  .seg button.on{background:var(--select-wash);color:var(--select)}
+  .chk{display:flex;align-items:center;gap:8px;font-size:14px;padding:3px 0;cursor:pointer}
+  .chk input{accent-color:var(--select)}
+  .hint{font-size:12.5px;color:var(--muted);line-height:1.45;margin-top:6px}
+  input[type=range]{width:100%;accent-color:var(--select)}
+  select.sel,input.search{width:100%;border:1.25px solid var(--frame);border-radius:6px;background:var(--paper);padding:7px 9px}
+  .alist{list-style:none;margin:8px 0 0;padding:0}
+  .alist li{display:flex;align-items:center;gap:10px;padding:6px 4px;border-radius:5px;cursor:pointer}
+  .alist li:hover{background:var(--wash)}
+  .alist li.on{background:var(--select-wash)}
+  .alist .nm{font:13.5px var(--f-mono);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .alist .ct{font:12px var(--f-mono);color:var(--muted)}
+  .avs{width:26px;height:26px;flex:none}
+  .dcard{border:1.25px solid var(--frame);border-radius:6px;padding:12px 13px;margin-bottom:6px}
+  .dcard .top{display:flex;gap:12px;align-items:center;margin-bottom:8px}
+  .dcard .nm{font:600 15px var(--f-mono);word-break:break-all}
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;font-size:13px}
+  .kv div:nth-child(odd){color:var(--muted)}
+  .pill{display:inline-block;font:12px var(--f-mono);border:1px solid var(--rule);border-radius:999px;padding:1px 8px;margin:3px 4px 0 0;color:var(--ink2)}
+  .trail{margin-top:6px;max-height:300px;overflow:auto;border-top:1px solid var(--rule)}
+  .trow{padding:5px 0;border-bottom:1px dashed var(--rule);font-size:12.5px;line-height:1.4;word-break:break-all}
+  .trow.inf{opacity:.7;border-left:2px dashed var(--muted);padding-left:6px}
+  .ccard{border:1.25px solid var(--rule);border-radius:6px;padding:9px 11px;margin-bottom:8px;cursor:pointer;background:var(--paper);width:100%;text-align:left;display:block}
+  .ccard:hover{border-color:var(--select-line)}
+  .ccard.on{border-color:var(--act);background:var(--act-wash)}
+  .ccard .kd{font:500 11px var(--f-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+  .ccard .lb{font:600 14px var(--f-mono);margin:3px 0;word-break:break-all}
+  .legend{display:grid;grid-template-columns:44px 1fr;gap:8px 10px;align-items:center;font-size:13px;color:var(--ink2)}
+  .legend svg{width:44px;height:30px;overflow:visible}
+
+  /* bottom dock */
+  #dock{position:absolute;left:calc(var(--mapl,84px) + (100vw - var(--mapl,84px))/2);transform:translateX(-50%);bottom:24px;display:flex;align-items:center;padding:6px 6px;z-index:12;max-width:calc(100vw - 24px)}
+  .dg{display:flex;align-items:center;gap:3px;padding:0 9px}
+  .dg+.dg{border-left:1.25px solid var(--rule)}
+  .dbtn{width:36px;height:36px;border-radius:6px;border:1.25px solid transparent;background:none;display:grid;place-items:center;cursor:pointer;color:var(--ink2);padding:0}
+  .dbtn:hover{background:var(--wash)}
+  .dbtn.on{color:var(--select);background:var(--select-wash);border-color:var(--select-line)}
+  .dbtn .ico{width:20px;height:20px}
+  .kbd{font:11.5px var(--f-mono);border:1.25px solid var(--rule);border-radius:4px;padding:1px 6px;color:var(--muted)}
+  #zread{font:14px var(--f-mono);min-width:54px;text-align:center;color:var(--ink2);cursor:pointer;background:none;border:0}
+  #spark{width:300px;height:36px;display:block;cursor:pointer;touch-action:none}
+  #tread{font:12.5px/1.25 var(--f-mono);color:var(--ink2);min-width:120px;text-align:right;white-space:nowrap}
+  #speed{border:1.25px solid var(--rule);border-radius:5px;background:var(--paper);padding:3px 4px;font:12.5px var(--f-mono)}
+
+  /* notes: the blue callouts */
+  #lead{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:9;overflow:visible}
+  #lead path{fill:none;stroke:var(--note);stroke-width:1.6}
+  #lead .hd{fill:var(--note);stroke:none}
+  #notes{position:absolute;inset:0;pointer-events:none;z-index:10}
+  .note{position:absolute;width:300px;background:var(--note);color:#fff;padding:12px 16px 13px;font-size:15px;line-height:1.5;
+    box-shadow:inset 0 0 0 3px var(--note),inset 0 0 0 4px rgba(255,255,255,.55);pointer-events:auto;transition:opacity .25s}
+  .note .nl{font:600 12px/1.2 var(--f-mono);letter-spacing:.2em;text-transform:uppercase;color:rgba(255,255,255,.82);margin-bottom:6px}
+  .note.fade{opacity:.55}
+
+  #tip{position:absolute;pointer-events:none;padding:8px 11px;font-size:13px;max-width:260px;opacity:0;z-index:14;transition:opacity .1s}
+  #tip .nm{font:600 13.5px var(--f-mono)}
+  #tip .sm{font:12px var(--f-mono);color:var(--muted)}
+
+  /* search palette */
+  #pal{position:fixed;inset:0;background:rgba(17,19,22,.28);z-index:20;display:flex;justify-content:center;align-items:flex-start;padding-top:12vh}
+  #pal[hidden]{display:none}
+  #pal .card{width:min(560px,92vw)}
+  #pal input{width:100%;border:0;border-bottom:1.25px solid var(--rule);padding:14px 16px;background:transparent;font-size:16px;outline:none}
+  #pal ul{list-style:none;margin:0;padding:6px;max-height:50vh;overflow:auto}
+  #pal li{padding:8px 10px;border-radius:5px;cursor:pointer;display:flex;gap:10px;align-items:center}
+  #pal li.on,#pal li:hover{background:var(--select-wash)}
+  #pal .k{font:500 11px var(--f-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);width:76px;flex:none}
+
+  /* forensics charts overlay */
+  #fx{position:absolute;left:calc(var(--mapl,84px) - 4px);right:16px;top:14px;bottom:100px;z-index:11;display:flex;flex-direction:column}
+  #fx[hidden]{display:none}
+  #fx .ph{display:flex;justify-content:space-between;align-items:center}
+  #fx-charts{flex:1;overflow:auto;padding:4px 18px 20px}
+  .fx-card{border:1.25px solid var(--rule);border-radius:6px;padding:12px 14px 8px;margin-top:12px;position:relative;background:var(--paper)}
+  .fx-card h3{font:600 14px/1.3 var(--f-sans);margin:0}
+  .fx-card .sub{font-size:12.5px;color:var(--muted);margin:3px 0 6px;max-width:760px}
+  .fx-legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--muted);margin-bottom:2px}
+  .fx-legend .sw{display:inline-block;width:14px;height:0;border-top:2px solid;vertical-align:middle;margin-right:5px}
+  .fx-legend .sw.dash{border-top-style:dashed}
+  .fx-card svg{display:block;width:100%;overflow:visible}
+  .fx-card svg text{font:11px var(--f-mono);fill:var(--muted)}
+  .fx-card svg .lab{font:600 11px var(--f-sans);fill:var(--ink)}
+  .fx-card svg .ms text{fill:var(--ink);opacity:.7}
+  .fx-tip{position:absolute;pointer-events:none;background:var(--paper);border:1.25px solid var(--frame);border-radius:6px;padding:6px 9px;font-size:12px;opacity:0;z-index:6;white-space:nowrap}
+  .fx-tip b{font-family:var(--f-mono);font-weight:500}
+  .fx-note{font-size:12.5px;color:var(--ink);margin:4px 0;padding:6px 9px;border-left:3px solid var(--act);background:var(--shade);border-radius:0 6px 6px 0}
+
+  /* ---- the world (SVG) */
+  .gridln{fill:none;stroke:var(--grid);stroke-width:1;vector-effect:non-scaling-stroke}
+  .wall{fill:url(#hatch);stroke:var(--frame);stroke-width:1.1;stroke-linejoin:round;vector-effect:non-scaling-stroke}
+  .htop{fill:var(--paper);stroke:var(--paper);stroke-width:1.2}
+  .edge{fill:none;stroke:var(--frame);stroke-width:1.4;stroke-linecap:round;vector-effect:non-scaling-stroke}
+  .cap{font:600 12px var(--f-mono);letter-spacing:.2em;fill:var(--muted);paint-order:stroke;stroke:var(--page);stroke-width:3px}
+  .hatch-bg{fill:var(--paper)} .hatch-ln{stroke:var(--frame);stroke-width:.9}
+  .tile{cursor:pointer}
+  .wash{fill:transparent}
+  .inner{fill:none;stroke:var(--rule);stroke-width:1;stroke-dasharray:3 3;vector-effect:non-scaling-stroke}
+  .tile.busy .wash{fill:var(--act-wash)}
+  .tile.busy .inner{stroke:var(--act);stroke-dasharray:4 3}
+  .tile.mark .inner{stroke:var(--act);stroke-dasharray:none;stroke-width:1.8}
+  .tile.adopt .inner{stroke:var(--act);stroke-dasharray:none;stroke-width:1.6}
+  .tile.tied .inner{stroke:var(--select-line);stroke-dasharray:4 3;stroke-width:1.4}
+  .tile.sel .wash{fill:var(--select-wash)}
+  .tile.sel .inner{stroke:var(--select);stroke-dasharray:none;stroke-width:2}
+  .tile.dim{opacity:.26}
+  .bf{stroke:var(--ink);stroke-width:1.1;stroke-linejoin:round;vector-effect:non-scaling-stroke}
+  .b-top,.b-l{fill:var(--paper)} .b-r{fill:var(--shade)}
+  .b-str{fill:none;stroke:var(--ink);stroke-width:.7;vector-effect:non-scaling-stroke;opacity:.8}
+  .stake{fill:none;stroke:var(--faint);stroke-width:1;stroke-dasharray:2 2;vector-effect:non-scaling-stroke}
+  .flag{stroke:var(--ink);stroke-width:.9;vector-effect:non-scaling-stroke}
+  .flag.hold{fill:var(--select)} .flag.claim{fill:var(--act)}
+  .lab{font:500 7.6px var(--f-mono);fill:var(--ink);display:none;paint-order:stroke;stroke:var(--paper);stroke-width:2.4px;stroke-linejoin:round}
+  .av{display:none}
+  .show-lab .lab,.tile.sel .lab,.tile.hov .lab{display:block}
+  .show-av .av,.tile.sel .av,.tile.hov .av{display:block}
+  .av-bg{fill:var(--paper);stroke:var(--frame);stroke-width:1;vector-effect:non-scaling-stroke}
+  .arc{fill:none;stroke:var(--select);stroke-width:1.7;stroke-linecap:round;vector-effect:non-scaling-stroke}
+  .arc.inf{stroke-dasharray:5 4}
+  .ahead{fill:var(--select)}
+  .pulse{fill:var(--select)}
+  .bdg circle{fill:var(--select);stroke:var(--paper);stroke-width:1.2;vector-effect:non-scaling-stroke}
+  .bdg text{fill:#fff;font-family:var(--f-mono);font-weight:600;text-anchor:middle;dominant-baseline:central}
+  .tie{fill:none;stroke:var(--select-line);stroke-dasharray:4 4;stroke-width:1.2;vector-effect:non-scaling-stroke}
+  .farc{fill:none;stroke:var(--act);stroke-width:1.8;vector-effect:non-scaling-stroke}
+  .farc.inf{stroke-dasharray:5 4}
+  .fhead{fill:var(--act)}
+
+  @media (max-width:820px){
+    #rail{left:8px;right:8px;top:8px;width:auto;flex-direction:row;justify-content:center;padding:4px 6px}
+    .rsep{width:1px;height:24px;margin:0 2px}
+    .rbtn{width:34px;height:34px} #rail{gap:2px}
+    #panel{left:8px;right:8px;top:auto;bottom:94px;width:auto;max-height:46vh}
+    #dock{left:8px;right:8px;transform:none;bottom:10px;flex-wrap:wrap;justify-content:center}
+    #spark{width:150px}
+    #tread{min-width:0}
+    .dg{padding:0 5px}
+    #fx{left:8px;right:8px;top:70px;bottom:94px}
+    .note{width:240px;font-size:13.5px}
+  }
+</style>
+
+<div id="app">
+  <div id="map">
+    <svg id="world" aria-label="World map: one hex per agent">
+      <defs>
+        <pattern id="hatch" width="4.2" height="4.2" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+          <rect class="hatch-bg" width="4.2" height="4.2"></rect><line class="hatch-ln" x1="0" y1="0" x2="0" y2="4.2"></line>
+        </pattern>
+      </defs>
+      <g id="zg">
+        <path id="g-grid" class="gridln"></path>
+        <g id="g-isl"></g>
+        <g id="g-ties"></g>
+        <g id="g-tiles"></g>
+        <g id="g-follow"></g>
+        <g id="g-arcs"></g>
+      </g>
+    </svg>
+    <svg id="lead"></svg>
+    <div id="notes"></div>
+    <div id="tip" class="card"></div>
+  </div>
+
+  <nav id="rail" class="card plinth" aria-label="Views">
+    <button class="rbtn" id="r-home" title="SwarmScope" aria-label="SwarmScope"><svg class="ico" viewBox="0 0 24 24"><path d="M12 2.8l8 4.6v9.2l-8 4.6-8-4.6V7.4z"/><circle cx="12" cy="12" r="2.6"/><path d="M12 9.4V5.6M14.3 13.3l3.2 1.9M9.7 13.3l-3.2 1.9"/></svg></button>
+    <div class="rsep"></div>
+    <button class="rbtn" data-view="world" title="World" aria-label="World overview"><svg class="ico" viewBox="0 0 24 24"><path d="M3.5 6.5l5.5-2.5 6 2.5 5.5-2.5v13.5l-5.5 2.5-6-2.5-5.5 2.5z"/><path d="M9 4v13.5M15 6.5V20"/></svg></button>
+    <button class="rbtn" data-view="agents" title="Agents" aria-label="Agents"><svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.6"/><path d="M4.8 20c.9-3.7 3.7-5.6 7.2-5.6s6.3 1.9 7.2 5.6"/></svg></button>
+    <button class="rbtn" data-view="follow" title="Follow an item" aria-label="Follow an item"><svg class="ico" viewBox="0 0 24 24"><circle cx="6" cy="6" r="2.3"/><circle cx="6" cy="18" r="2.3"/><circle cx="18" cy="9" r="2.3"/><path d="M6 8.3v7.4M8.2 6.6c4.6.2 7.6 0 7.6 0M6 15.5c0-3.5 4.6-5.3 9.7-6"/></svg></button>
+    <button class="rbtn" data-view="charts" id="r-charts" title="Forensics charts" aria-label="Forensics charts" hidden><svg class="ico" viewBox="0 0 24 24"><path d="M4 19.5h16"/><path d="M5 15l4-4.5 3.5 3 6.5-7.5"/></svg></button>
+    <button class="rbtn" data-view="layers" title="Layers and settings" aria-label="Layers and settings"><svg class="ico" viewBox="0 0 24 24"><path d="M12 3.5l8.5 4.5-8.5 4.5L3.5 8z"/><path d="M3.5 12l8.5 4.5 8.5-4.5M3.5 16l8.5 4.5 8.5-4.5"/></svg></button>
+    <button class="rbtn" id="r-graph" title="Open this moment in the graph view" aria-label="Graph view" hidden><svg class="ico" viewBox="0 0 24 24"><circle cx="5.5" cy="6" r="2.2"/><circle cx="18.5" cy="8" r="2.2"/><circle cx="9" cy="18" r="2.2"/><circle cx="17" cy="17.5" r="1.6"/><path d="M7.6 6.4l8.7 1.3M6.3 8l2 7.9M10.9 16.9l4.6-2.6 1.8-4.4M11.2 18.2l4.2-.4"/></svg></button>
+    <div class="rsep"></div>
+    <button class="rbtn" id="r-help" title="How to read the map" aria-label="How to read the map"><svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.6"/><path d="M9.6 9.6a2.5 2.5 0 1 1 3.4 2.3c-.7.3-1 .8-1 1.5v.5"/><circle cx="12" cy="17" r=".4" fill="currentColor"/></svg></button>
+  </nav>
+
+  <aside id="panel" class="card plinth" aria-label="Panel">
+    <div class="ph">
+      <div class="ph-top"><span class="eyebrow" id="p-eyebrow">World</span>
+        <button class="xbtn" id="p-close" title="Collapse panel" aria-label="Collapse panel"><svg class="ico" viewBox="0 0 24 24"><rect x="4" y="4.5" width="16" height="15" rx="1.5"/><path d="M9.5 4.5v15M15.5 9.5l-2.5 2.5 2.5 2.5"/></svg></button>
+      </div>
+      <div class="ptitle" id="p-title"></div>
+      <div class="tabs" id="p-tabs"><button class="tab on" data-tab="overview">Overview</button><button class="tab" data-tab="timeline">Timeline</button></div>
+    </div>
+    <div class="pb">
+      <section class="view" id="v-world-overview"></section>
+      <section class="view" id="v-world-timeline" hidden></section>
+      <section class="view" id="v-agents" hidden></section>
+      <section class="view" id="v-follow" hidden></section>
+      <section class="view" id="v-layers" hidden></section>
+      <section class="view" id="v-help" hidden></section>
+    </div>
+    <div class="pf"><div class="seg" id="theme" role="group" aria-label="Theme" style="display:flex">
+      <button data-th="light" style="flex:1">☼ Light</button><button data-th="dark" style="flex:1">☾ Dark</button><button data-th="system" style="flex:1">▭ System</button></div></div>
+  </aside>
+
+  <section id="fx" class="card plinth" hidden aria-label="Forensics charts">
+    <div class="ph"><span class="eyebrow">Forensics · one clock</span>
+      <button class="xbtn" id="fx-close" title="Close charts" aria-label="Close charts"><svg class="ico" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+    <div id="fx-charts"></div>
+  </section>
+
+  <div id="dock" class="card plinth" aria-label="Replay controls">
+    <div class="dg"><button class="dbtn" id="d-search" title="Search (⌘K)" aria-label="Search"><svg class="ico" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5 5"/></svg></button><span class="kbd">⌘K</span></div>
+    <div class="dg">
+      <button class="dbtn on" id="d-arcs" title="Exchanges (arcs)" aria-label="Exchanges"><svg class="ico" viewBox="0 0 24 24"><path d="M4 17c2-8 14-8 16 0"/><path d="M17 14.5l3 2.5-3.6 1.3"/></svg></button>
+      <button class="dbtn on" id="d-heat" title="Who is busy now" aria-label="Activity"><svg class="ico" viewBox="0 0 24 24"><path d="M3 12h4l2.5-6 5 12L17 12h4"/></svg></button>
+      <button class="dbtn" id="d-ties" title="All ties (dashed)" aria-label="All ties"><svg class="ico" viewBox="0 0 24 24"><circle cx="5.5" cy="12" r="2.2"/><circle cx="18.5" cy="6.5" r="2.2"/><circle cx="18.5" cy="17.5" r="2.2"/><path d="M7.6 11l8.8-3.6M7.6 13l8.8 3.6" stroke-dasharray="2 2.2"/></svg></button>
+      <button class="dbtn" id="d-labels" title="Names" aria-label="Names"><svg class="ico" viewBox="0 0 24 24"><path d="M5 7V5.5h14V7M12 5.5v13M9 18.5h6"/></svg></button>
+    </div>
+    <div class="dg"><button class="dbtn" id="z-out" title="Zoom out" aria-label="Zoom out"><svg class="ico" viewBox="0 0 24 24"><path d="M6 12h12"/></svg></button><button id="zread" title="Fit the world" aria-label="Fit the world">100%</button><button class="dbtn" id="z-in" title="Zoom in" aria-label="Zoom in"><svg class="ico" viewBox="0 0 24 24"><path d="M6 12h12M12 6v12"/></svg></button></div>
+    <div class="dg">
+      <button class="dbtn" id="play" title="Play (space)" aria-label="Play"><svg class="ico" viewBox="0 0 24 24" id="play-ico"><path d="M8 5.5v13l10.5-6.5z"/></svg></button>
+      <canvas id="spark" aria-label="Timeline: drag to move in time"></canvas>
+      <div id="tread"></div>
+      <select id="speed" aria-label="Speed"><option value="0.5">½×</option><option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option><option value="8">8×</option></select>
+    </div>
+  </div>
+
+  <div id="pal" hidden><div class="card plinth" role="dialog" aria-label="Search"><input id="pal-in" placeholder="Search agents, items, milestones…" autocomplete="off"><ul id="pal-ul"></ul></div></div>
+  <pre id="err" hidden></pre>
+</div>
+
+<script>/*__D3__*/</script>
+<script>
+const DATA = /*__DATA__*/;
+window.addEventListener('error',e=>{ const el=document.getElementById('err'); if(el){ el.hidden=false; el.textContent+=`${e.message} @${e.lineno}:${e.colno}\n`; } });
+(function(){
+"use strict";
+const META=DATA.meta, CLOCK=DATA.clock||{}, MAXPOS=META.maxpos||1, ATTR=!!META.attributed;
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const HAS_CLOCK=!!(CLOCK.n_timed&&CLOCK.window);
+const LONG=HAS_CLOCK&&(CLOCK.tmax-CLOCK.tmin)>3*86400;
+const iso=ts=>new Date(ts*1000).toISOString();
+const fmtTime=ts=>iso(ts).slice(0,16).replace('T',' ')+' UTC';
+const fmtShort=ts=>LONG?iso(ts).slice(5,16).replace('T',' '):iso(ts).slice(11,16);
+const pct=x=>x==null?'—':(x*100).toFixed(1)+'%';
+const nf=x=>x==null?'—':Math.round(x).toLocaleString();
+const REDUCED=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const ub=(a,x)=>{let l=0,h=a.length;while(l<h){const m=(l+h)>>1;if(a[m]<=x)l=m+1;else h=m;}return l;};
+const ubk=(a,x,f)=>{let l=0,h=a.length;while(l<h){const m=(l+h)>>1;if(f(a[m])<=x)l=m+1;else h=m;}return l;};
+function hash(s){let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return h>>>0;}
+const dur=s=>{s=Math.abs(s); if(s<5400) return Math.round(s/60)+' min'; if(s<172800) return (s/3600).toFixed(s<36000?1:0)+' h'; return Math.round(s/86400)+' days';};
+const ICO={msg:'<svg class="ico" viewBox="0 0 24 24"><path d="M4.5 5.5h15v10h-9l-4 3.5v-3.5h-2z"/></svg>',
+  flag:'<svg class="ico" viewBox="0 0 24 24"><path d="M6 20V4.5M6 5h11l-2.5 4 2.5 4H6"/></svg>',
+  dot:'<svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/></svg>',
+  bolt:'<svg class="ico" viewBox="0 0 24 24"><path d="M13 3L5 13.5h6l-1 7.5 8-10.5h-6z"/></svg>'};
+const SIG_NAME={shared_deaddrop:'shared resource',shared_deaddrop_nontask:'shared non-task resource',private_channel:'private channel',
+  credential_reuse:'credential reuse',board:'board / mailbox',duplicate_control:'duplicate control',signed_cmd:'signed command'};
+
+// ======================================================================
+// 1. Tiles: one per agent. Human viewers share one tile when there are many.
+// ======================================================================
+const nodeById=new Map(DATA.nodes.map(n=>[n.id,n]));
+const agentNodes=DATA.nodes.filter(n=>n.ty==='agent');
+const isHum=n=>/^human:/.test(n.lab);
+const GENERIC=META.source==='generic', WHO=GENERIC?'actors':'agents';
+const hums=agentNodes.filter(isHum), bots=agentNodes.filter(n=>!isHum(n));
+const AGG=hums.length>12;
+const tiles=[], tileOf=new Map();
+const mk=o=>{o.i=tiles.length; tiles.push(o); return o;};
+bots.forEach(n=>tileOf.set(n.id,mk({id:n.id,lab:n.lab,nodes:[n],kind:'agent'})));
+if(AGG){ const v=mk({id:'viewers',lab:`${hums.length} viewers`,nodes:hums,kind:'viewers'}); hums.forEach(n=>tileOf.set(n.id,v)); }
+else hums.forEach(n=>tileOf.set(n.id,mk({id:n.id,lab:n.lab.replace(/^human:/,'viewer '),nodes:[n],kind:'human'})));
+tiles.forEach(T=>{
+  const evC=[],evP=[]; let nev=0,ns=0;
+  T.nodes.forEach(n=>{ (n.ev||[]).forEach(r=>{ if(r[0]!=null) evC.push(r[0]); evP.push(r[1]); }); nev+=(n.n_ev||n.c||0); ns+=(n.ev||[]).length; });
+  evC.sort((a,b)=>a-b); evP.sort((a,b)=>a-b);
+  Object.assign(T,{evC,evP,scale:ns?Math.max(1,nev/ns):1,total:Math.max(nev,d3.sum(T.nodes,n=>n.c||0)),
+    t0:d3.min(T.nodes,n=>n.t0), p0:d3.min(T.nodes,n=>n.p0), obs:d3.sum(T.nodes,n=>n.obs||0),
+    status:(ATTR&&T.kind==='agent')?(T.nodes[0].comm||0):0, role:T.nodes[0].role, mech:T.kind==='agent'?(T.nodes[0].mech||[]):[]});
+});
+const CMAX=d3.max(tiles,T=>T.total)||1;
+
+// ties (agent graph): @-addresses on named logs, shared rare resources on redacted logs
+const tieMap=new Map();
+const tkey=(a,b)=>a.i<b.i?a.i+'|'+b.i:b.i+'|'+a.i;
+DATA.proj_links.forEach(l=>{ const a=tileOf.get(l.s), b=tileOf.get(l.t); if(!a||!b||a===b) return;
+  const k=tkey(a,b); let e=tieMap.get(k);
+  if(!e){ e={a:a.i<b.i?a:b,b:a.i<b.i?b:a,w:0,t0:l.t0,p0:l.p0}; tieMap.set(k,e); }
+  e.w+=(l.w||1); if(l.t0!=null&&(e.t0==null||l.t0<e.t0)) e.t0=l.t0; if(l.p0<e.p0) e.p0=l.p0; });
+const ties=[...tieMap.values()];
+const TIE_MAX=d3.max(ties,e=>e.w)||1;
+tiles.forEach(T=>T.ties=[]); ties.forEach(e=>{e.a.ties.push(e); e.b.ties.push(e);});
+tiles.forEach(T=>{T.deg=d3.sum(T.ties,e=>e.w); T.ties.sort((x,y)=>y.w-x.w);});
+const tieW=(a,b)=>{const e=tieMap.get(tkey(a,b)); return e?e.w:0;};
+
+// exchanges (animated arcs)
+const EX=DATA.exchanges||{agents:[],base:0,rows:[]};
+const exAll=[];
+EX.rows.forEach(r=>{ const s=tileOf.get(EX.agents[r[2]]), d=tileOf.get(EX.agents[r[3]]); if(!s||!d||s===d) return;
+  exAll.push({ts:r[0]==null?null:EX.base+r[0],pos:r[1],s,d,inf:!!r[4]}); });
+const exClock=exAll.filter(e=>e.ts!=null).sort((a,b)=>a.ts-b.ts), exPos=exAll.slice().sort((a,b)=>a.pos-b.pos);
+
+// ======================================================================
+// 2. Islands: the pipeline's communities (label propagation on the same agent
+//    graph, as in the paper; computed in export.py), packed on a hex lattice.
+//    The packing is a layout, not a measurement.
+// ======================================================================
+const groups=new Map();
+tiles.filter(T=>T.kind==='agent'&&T.deg>0).forEach(T=>{
+  const n=T.nodes[0], g=n.grp!=null?n.grp:(ATTR?0:n.comm);       // older data: no "grp"
+  if(!groups.has(g)) groups.set(g,[]); groups.get(g).push(T); });
+const islands=[...groups.values()].map(m=>({members:m,kind:'comm'}));
+const unl=tiles.filter(T=>T.kind==='agent'&&T.deg===0); if(unl.length) islands.push({members:unl,kind:'unlinked'});
+const hv=tiles.filter(T=>T.kind!=='agent'); if(hv.length) islands.push({members:hv,kind:'viewers'});
+islands.sort((a,b)=>b.members.length-a.members.length);
+islands.forEach((I,k)=>{ I.k=k; I.members.forEach(T=>T.isl=I); });
+
+const R=40, K=0.6, SQ3=Math.sqrt(3), D=R*0.3;           // hex size, vertical squash (the tilt), plinth depth
+const DIRS=[[1,0],[1,-1],[0,-1],[-1,0],[-1,1],[0,1]];
+function spiral(n){ const out=[[0,0]];
+  for(let r=1; out.length<n; r++){ let q=-r, s=r;
+    for(let i=0;i<6&&out.length<n;i++) for(let j=0;j<r&&out.length<n;j++){ out.push([q,s]); q+=DIRS[i][0]; s+=DIRS[i][1]; } }
+  return out; }
+const px=(q,r)=>[R*SQ3*(q+r/2), R*1.5*K*r];
+// cells inside an island: the busiest agent in the middle, then each next
+// ring cell goes to the agent most tied to its already placed neighbours
+islands.forEach(I=>{
+  const cells=spiral(I.members.length), left=new Set(I.members), at=new Map();
+  cells.forEach(([q,r])=>{
+    const nb=DIRS.map(([a,b])=>at.get((q+a)+','+(r+b))).filter(Boolean);
+    let best=null,bs=-1;
+    for(const T of left){ let s=0; for(const N of nb) s+=tieW(T,N); s=s*1e7+T.deg+T.total*1e-6; if(s>bs){bs=s;best=T;} }
+    left.delete(best); at.set(q+','+r,best); best.lq=q; best.lr=r;
+  });
+});
+// islands: a force layout on community centroids, then snapped to the lattice
+// with one empty cell between islands
+(function place(){
+  const inodes=islands.map(I=>({r:R*SQ3*0.62*Math.sqrt(I.members.length)+R*1.4}));
+  const im=new Map();
+  ties.forEach(e=>{ const A=e.a.isl.k,B=e.b.isl.k; if(A===B) return; const key=A<B?A+'|'+B:B+'|'+A; im.set(key,(im.get(key)||0)+e.w); });
+  const il=[...im].map(([key,w])=>{const p=key.split('|'); return {source:+p[0],target:+p[1],w};});
+  const iw=d3.max(il,l=>l.w)||1;
+  const sim=d3.forceSimulation(inodes).force('charge',d3.forceManyBody().strength(-60))
+    .force('link',d3.forceLink(il).strength(l=>0.04+0.5*l.w/iw).distance(l=>inodes[l.source.index].r+inodes[l.target.index].r+R))
+    .force('collide',d3.forceCollide(d=>d.r)).force('x',d3.forceX(0).strength(0.06)).force('y',d3.forceY(0).strength(0.09)).stop();
+  for(let i=0;i<400;i++) sim.tick();
+  const occ=new Set(), around=spiral(9000);
+  const rnd=(fq,fr)=>{ let x=fq,z=fr,y=-x-z, rx=Math.round(x),ry=Math.round(y),rz=Math.round(z);
+    const dx=Math.abs(rx-x),dy=Math.abs(ry-y),dz=Math.abs(rz-z);
+    if(dx>dy&&dx>dz) rx=-ry-rz; else if(dy>dz) ry=-rx-rz; else rz=-rx-ry; return [rx,rz]; };
+  islands.forEach((I,k)=>{
+    const x=inodes[k].x*1.05, y=inodes[k].y*1.25;
+    const tgt=rnd((SQ3/3*x-y/3)/R,(2/3*y)/R);
+    for(const [dq,dr] of around){
+      const oq=tgt[0]+dq, or=tgt[1]+dr; let ok=true;
+      for(const T of I.members){ const q=oq+T.lq, r=or+T.lr;
+        if(occ.has(q+','+r)){ok=false;break;}
+        for(const [a,b] of DIRS) if(occ.has((q+a)+','+(r+b))){ok=false;break;}
+        if(!ok) break; }
+      if(ok){ I.members.forEach(T=>{T.q=oq+T.lq; T.r=or+T.lr; occ.add(T.q+','+T.r); [T.x,T.y]=px(T.q,T.r);}); break; }
+    }
+  });
+})();
+const cellSet=new Map(tiles.map(T=>[T.q+','+T.r,T]));
+
+// ======================================================================
+// 3. Draw the static world: lattice, plinths, plots
+// ======================================================================
+const corner=(i,s=1)=>{const a=Math.PI/180*(60*i+30); return [R*s*Math.cos(a), R*s*K*Math.sin(a)];};
+const hexD=(cx,cy,s=1)=>'M'+[0,1,2,3,4,5].map(i=>{const c=corner(i,s); return (cx+c[0]).toFixed(1)+','+(cy+c[1]).toFixed(1);}).join('L')+'Z';
+const svg=d3.select('#world'), zg=d3.select('#zg');
+const bounds={x0:d3.min(tiles,T=>T.x)-R*1.2,x1:d3.max(tiles,T=>T.x)+R*1.2,y0:d3.min(tiles,T=>T.y)-R*1.6,y1:d3.max(tiles,T=>T.y)+R*1.4};
+let gridRaf=0;
+function drawGrid(){ if(gridRaf) return; gridRaf=requestAnimationFrame(()=>{ gridRaf=0;
+  const el=document.getElementById('g-grid');
+  if(R*zk<8){ el.setAttribute('d',''); return; }
+  const x0=-ztx/zk, x1=(innerWidth-ztx)/zk, y0=-zty/zk, y1=(innerHeight-zty)/zk, rh=R*1.5*K, cw=R*SQ3;
+  let d='', n=0;
+  for(let r=Math.floor(y0/rh)-1;r<=Math.ceil(y1/rh)+1;r++){
+    for(let q=Math.floor(x0/cw-r/2)-1;q<=Math.ceil(x1/cw-r/2)+1;q++){ if(cellSet.has(q+','+r)) continue; const [x,y]=px(q,r); d+=hexD(x,y); if(++n>6000) break; } }
+  el.setAttribute('d',d); }); }
+const capBoxes=[];
+(function drawIslands(){
+  const g=d3.select('#g-isl');
+  islands.slice().sort((a,b)=>d3.min(a.members,T=>T.y)-d3.min(b.members,T=>T.y)).forEach(I=>{
+    const gi=g.append('g').attr('class','island');
+    let walls='', edges='';
+    const inI=(q,r)=>{const T=cellSet.get(q+','+r); return T&&T.isl===I;};
+    I.members.forEach(T=>{
+      for(let i=0;i<6;i++){ const [dq,dr]=DIRS[5-i]; if(inI(T.q+dq,T.r+dr)) continue;
+        const a=corner(i), b=corner((i+1)%6), x=T.x, y=T.y;
+        edges+=`M${(x+a[0]).toFixed(1)},${(y+a[1]).toFixed(1)}L${(x+b[0]).toFixed(1)},${(y+b[1]).toFixed(1)}`;
+        if(i<=1) walls+=`M${(x+a[0]).toFixed(1)},${(y+a[1]).toFixed(1)}L${(x+b[0]).toFixed(1)},${(y+b[1]).toFixed(1)}L${(x+b[0]).toFixed(1)},${(y+b[1]+D).toFixed(1)}L${(x+a[0]).toFixed(1)},${(y+a[1]+D).toFixed(1)}Z`;
+      }
+    });
+    gi.append('path').attr('class','wall').attr('d',walls);
+    gi.append('path').attr('class','htop').attr('d',I.members.map(T=>hexD(T.x,T.y)).join(''));
+    gi.append('path').attr('class','edge').attr('d',edges);
+    const by=d3.max(I.members,T=>T.y), bottom=I.members.filter(T=>T.y===by);
+    const top=I.members.slice().sort((a,b)=>b.deg-a.deg).slice(0,2).map(T=>T.lab.toUpperCase());
+    const cap = I.kind==='unlinked' ? `NO TIES · ${I.members.length} ${WHO.toUpperCase()}`
+      : I.kind==='viewers' ? `HUMAN VIEWERS · ${hums.length}`
+      : (I.members.length<=2 ? top.join(' · ') : `${top.join(' · ')} · +${I.members.length-2}`);
+    I.cap=cap;
+    let cx=d3.mean(bottom,T=>T.x), cy=by+R*K+D+19; const cw=cap.length*8.6;
+    for(let k=0;k<4;k++){ const hit=capBoxes.find(b=>Math.abs(b[1]-cy)<16&&Math.abs(b[0]-cx)<(b[2]+cw)/2+12); if(!hit) break; cy=hit[1]+17; }
+    capBoxes.push([cx,cy,cw]);
+    gi.append('text').attr('class','cap').attr('x',cx).attr('y',cy).attr('text-anchor','middle').text(cap);
+  });
+})();
+
+capBoxes.forEach(([cx,cy,cw])=>{ bounds.x0=Math.min(bounds.x0,cx-cw/2); bounds.x1=Math.max(bounds.x1,cx+cw/2); bounds.y1=Math.max(bounds.y1,cy+6); });
+// identicon avatars (our own procedural badges)
+const AVC=['#5b7bd5','#d9731a','#3f9d8c','#b5527e','#7a68c9','#c49a1c','#5a8f3c','#c0584b','#4c8fb8'];
+const avColor=s=>AVC[hash(s)%AVC.length];
+function identicon(s,cx,cy,side){ const h=hash(s+'#'), c=side/5; let d='';
+  for(let y=0;y<5;y++) for(let x=0;x<3;x++){ if(!((h>>(y*3+x))&1)) continue;
+    for(const xx of (x===2?[2]:[x,4-x])) d+=`M${(cx-side/2+xx*c).toFixed(2)},${(cy-side/2+y*c).toFixed(2)}h${c.toFixed(2)}v${c.toFixed(2)}h${(-c).toFixed(2)}Z`; }
+  return d||`M${cx-c/2},${cy-c/2}h${c}v${c}h${-c}Z`; }
+function avatarSvg(T,size=26){ const r=size/2;
+  return `<svg class="avs" viewBox="0 0 ${size} ${size}" style="width:${size}px;height:${size}px"><circle cx="${r}" cy="${r}" r="${r-1}" fill="var(--paper)" stroke="var(--frame)"/>`
+    +`<path d="${identicon(T.lab,r,r,size*0.52)}" fill="${avColor(T.lab)}"/></svg>`; }
+
+// isometric buildings
+const BA=R*0.36, BB=BA*0.52, BY=-R*0.04, AVY=R*0.56, AVR=R*0.19;
+const P=p=>p[0].toFixed(1)+','+p[1].toFixed(1);
+function bld(h,wide,w0,y0){ const a=BA*(wide?1.35:1)*(w0||1), b=BB*(wide?1.35:1)*(w0||1), by=BY-(y0||0);
+  const L=[-a,by],F=[0,by+b],Rt=[a,by],B=[0,by-b],u=p=>[p[0],p[1]-h];
+  let st=''; const n=Math.floor(h/(R*0.085));
+  for(let k=1;k<n;k++){ const y=k*h/n; st+=`M${P([F[0]+a*0.12,F[1]-y-b*0.12])}L${P([Rt[0]-a*0.06,Rt[1]-y-b*0.0])}`; }
+  return {l:`M${P(L)}L${P(F)}L${P(u(F))}L${P(u(L))}Z`, r:`M${P(F)}L${P(Rt)}L${P(u(Rt))}L${P(u(F))}Z`,
+    t:`M${P(u(L))}L${P(u(F))}L${P(u(Rt))}L${P(u(B))}Z`, s:st}; }
+const stakeD=`M${P([-BA,BY])}L${P([0,BY+BB])}L${P([BA,BY])}L${P([0,BY-BB])}Z`;
+const hOf=c=>c<=0?0:R*(0.16+0.52*Math.log1p(c)/Math.log1p(CMAX));
+// three building types so the city has some variety (picked by name, carries no meaning)
+const VAR=T=>T.kind!=='agent'?0:hash(T.lab+'~')%3;
+const shortLab=s=>s.length>13?s.slice(0,12)+'…':s;
+
+const tileSel=d3.select('#g-tiles').selectAll('g.tile').data(tiles.slice().sort((a,b)=>a.y-b.y||a.x-b.x),T=>T.id).join(en=>{
+  const g=en.append('g').attr('class','tile').attr('transform',T=>`translate(${T.x.toFixed(1)},${T.y.toFixed(1)})`);
+  g.append('path').attr('class','wash').attr('d',hexD(0,0,0.97));
+  g.append('path').attr('class','inner').attr('d',hexD(0,0,0.83));
+  g.append('path').attr('class','stake').attr('d',stakeD);
+  const b=g.append('g').attr('class','bld');
+  b.append('path').attr('class','bf b-l'); b.append('path').attr('class','bf b-r'); b.append('path').attr('class','bf b-top'); b.append('path').attr('class','b-str');
+  b.append('path').attr('class','bf b-l u2'); b.append('path').attr('class','bf b-r u2'); b.append('path').attr('class','bf b-top u2'); b.append('path').attr('class','b-str u2');
+  g.append('path').attr('class','flag');
+  g.append('text').attr('class','lab').attr('y',R*0.3).attr('text-anchor','middle').text(T=>shortLab(T.lab));
+  const av=g.append('g').attr('class','av');
+  av.append('circle').attr('class','av-bg').attr('cy',AVY).attr('r',AVR);
+  av.append('path').attr('d',T=>identicon(T.lab,0,AVY,AVR*1.15)).attr('fill',T=>avColor(T.lab));
+  return g; });
+tileSel.each(function(T){ const s=d3.select(this); T.el={g:this,l:s.select('.b-l').node(),r:s.select('.b-r').node(),t:s.select('.b-top').node(),
+  s:s.select('.b-str').node(),u2:s.selectAll('.u2').nodes(),stake:s.select('.stake').node(),bld:s.select('.bld').node(),flag:s.select('.flag').node(),wash:s.select('.wash').node()}; T.h=-1; });
+
+// ======================================================================
+// 4. State, time
+// ======================================================================
+let axis=HAS_CLOCK?'clock':'discovery', range='week', timeMode='cumulative';
+let lo=0,hi=MAXPOS,t=MAXPOS,W=1,WA=1;
+let playing=false, speed=1, showInf=true, tieMin=0, mech='';
+const layer={arcs:true,heat:true,ties:false,labels:false};
+let selected=null, hovered=null, follow=null;
+const keyOf=e=>axis==='clock'?e.ts:e.pos;
+function setBounds(){
+  if(axis==='clock'){ if(range==='week'){lo=CLOCK.window[0];hi=CLOCK.window[1];W=6*3600;} else {lo=CLOCK.tmin;hi=CLOCK.tmax;W=Math.max(6*3600,(hi-lo)*0.02);} }
+  else { lo=0; hi=MAXPOS; W=Math.max(50,Math.round(MAXPOS*0.08)); }
+  WA=(hi-lo)/90;
+}
+function countAt(T,x){ const ev=axis==='clock'?T.evC:T.evP, t0=axis==='clock'?T.t0:T.p0;
+  if(t0==null||x<t0) return 0; if(!ev.length) return T.total; return Math.max(1,Math.round(ub(ev,x)*T.scale)); }
+function countIn(T,a,b){ const ev=axis==='clock'?T.evC:T.evP; return (ub(ev,b)-ub(ev,a))*T.scale; }
+const exList=()=>axis==='clock'?exClock:exPos;
+function exIn(a,b){ const L=exList(), i=ubk(L,a,keyOf), j=ubk(L,b,keyOf); return L.slice(i,j).filter(e=>showInf||!e.inf); }
+const claimTs=new Map();
+(function(){ const F=DATA.forensics||{}, h=(DATA.headline||{}).claim;
+  (F.claims||[]).forEach(c=>{ const nm=c.name.split(' ')[0]; if(c.times&&c.times.length) claimTs.set('agent:'+nm,d3.min(c.times)); });
+  if(h) claimTs.set('agent:'+h.agent,h.ts); })();
+
+// ======================================================================
+// 5. Per-frame render: buildings, washes, arcs, ties, follow, notes
+// ======================================================================
+const gArcs=d3.select('#g-arcs'), gTies=d3.select('#g-ties'), gFol=d3.select('#g-follow');
+let zk=1;
+function topOf(T){ return [T.x, T.y+BY-Math.max(T.h>0?(T.topY||T.h):0,0)-R*0.05]; }
+function renderTiles(){
+  const busyN=new Map(); let bmax=1;
+  if(layer.heat){ // only the busiest agents of the moment (about the top 12%), so orange keeps meaning something
+    const cs=tiles.map(T=>[T,countIn(T,t-WA*2,t)]).filter(x=>x[1]>0).sort((a,b)=>b[1]-a[1]);
+    cs.slice(0,Math.max(3,Math.ceil(tiles.length*0.12))).forEach(([T,c])=>{ busyN.set(T,c); bmax=Math.max(bmax,c); }); }
+  const adopted=followAdopted();
+  const focus=selected||hovered;
+  const tied=new Set(focus?focus.ties.slice(0,14).map(e=>e.a===focus?e.b:e.a):[]);
+  for(const T of tiles){
+    let c=countAt(T,t);
+    if(timeMode==='window' && countIn(T,t-W,t)<=0) c=0;
+    const gone=!showInf&&!ATTR&&T.obs===0;
+    const h=gone?0:hOf(c);
+    if(Math.abs(h-T.h)>0.25){ T.h=h;
+      if(h>0){ const v=VAR(T);
+        // 0: a block; 1: a block with a smaller block on top; 2: a narrow tower
+        const p = v===1 ? bld(h*0.62,false,1.12) : v===2 ? bld(h*1.12,false,0.72) : bld(h,T.kind!=='agent');
+        T.el.l.setAttribute('d',p.l); T.el.r.setAttribute('d',p.r); T.el.t.setAttribute('d',p.t); T.el.s.setAttribute('d',p.s);
+        const q = v===1 ? bld(h*0.5,false,0.62,h*0.62) : null;
+        T.el.u2.forEach((n,k)=>n.setAttribute('d',q?[q.l,q.r,q.t,q.s][k]:''));
+        T.topY = v===1 ? h*1.12 : v===2 ? h*1.12 : h;
+        T.el.bld.style.display=''; T.el.stake.style.display='none'; }
+      else { T.el.bld.style.display='none'; T.el.stake.style.display=''; } }
+    // flags: the assigned holder of a privileged role (blue), an unassigned claimant once it claims (orange)
+    let fl='';
+    if(T.h>0 && (T.status===2 || (T.status===1 && axis==='clock' && t>=(claimTs.get(T.id)??T.t0)))){
+      const y=BY-(T.topY||T.h)-BB*0.2; fl=`M0,${y.toFixed(1)}V${(y-R*0.42).toFixed(1)}L${(R*0.3).toFixed(1)},${(y-R*0.33).toFixed(1)}L0,${(y-R*0.24).toFixed(1)}`;
+      T.el.flag.setAttribute('class','flag '+(T.status===2?'hold':'claim')); }
+    T.el.flag.setAttribute('d',fl);
+    const cl=T.el.g.classList;
+    const b=busyN.get(T);
+    cl.toggle('busy',!!b); T.el.wash.style.opacity=b?(0.35+0.65*b/bmax).toFixed(2):'';
+    cl.toggle('sel',T===selected); cl.toggle('hov',T===hovered);
+    cl.toggle('tied',tied.has(T));
+    const mOn=mech&&T.mech.includes(mech);
+    cl.toggle('mark',!!mOn);
+    cl.toggle('adopt',!!(adopted&&adopted.has(T)));
+    cl.toggle('dim',gone || (mech&&!mOn) || (adopted&&!adopted.has(T)));
+  }
+}
+function quad(a,b,lift){ const mx=(a[0]+b[0])/2, my=(a[1]+b[1])/2, d=Math.hypot(b[0]-a[0],b[1]-a[1]);
+  return [mx, my-(d*0.38+R*0.5)*(lift||1)]; }
+const qpt=(a,c,b,s)=>[(1-s)*(1-s)*a[0]+2*(1-s)*s*c[0]+s*s*b[0],(1-s)*(1-s)*a[1]+2*(1-s)*s*c[1]+s*s*b[1]];
+function arrowAt(a,c,b,sz){ const dx=2*(b[0]-c[0]), dy=2*(b[1]-c[1]), an=Math.atan2(dy,dx);
+  return `M${P(b)}L${P([b[0]-sz*Math.cos(an-0.42),b[1]-sz*Math.sin(an-0.42)])}L${P([b[0]-sz*Math.cos(an+0.42),b[1]-sz*Math.sin(an+0.42)])}Z`; }
+function renderArcs(){
+  const s=1/zk;
+  let rows=[];
+  if(layer.arcs){
+    const pairs=new Map();
+    for(const e of exIn(t-WA,t)){ const k=e.s.i+'>'+e.d.i; let p=pairs.get(k);
+      if(!p){ p={s:e.s,d:e.d,n:0,last:keyOf(e),inf:true}; pairs.set(k,p); }
+      p.n++; p.last=Math.max(p.last,keyOf(e)); if(!e.inf) p.inf=false; }
+    rows=[...pairs.values()].sort((a,b)=>b.last-a.last).slice(0,90);
+  }
+  const g=gArcs.selectAll('g.ar').data(rows,d=>d.s.i+'>'+d.d.i).join(en=>{ const g=en.append('g').attr('class','ar');
+    g.append('path').attr('class','arc'); g.append('path').attr('class','ahead'); g.append('circle').attr('class','pulse');
+    const b=g.append('g').attr('class','bdg'); b.append('circle'); b.append('text'); return g; });
+  g.each(function(d){
+    const a=topOf(d.s), b=topOf(d.d), c=quad(a,b), age=(t-d.last)/WA, sel=d3.select(this);
+    sel.attr('opacity',Math.max(0.18,1-age*0.8)*(follow?0.18:1));
+    sel.select('.arc').attr('d',`M${P(a)}Q${P(c)} ${P(b)}`).classed('inf',d.inf);
+    sel.select('.ahead').attr('d',arrowAt(a,c,b,7*s));
+    const fresh=!REDUCED&&playing&&age<0.35, pt=qpt(a,c,b,Math.min(1,age/0.35));
+    sel.select('.pulse').attr('r',fresh?3.2*s:0).attr('cx',pt[0]).attr('cy',pt[1]);
+    const m=qpt(a,c,b,0.5);
+    sel.select('.bdg').attr('display',d.n>1?null:'none').attr('transform',`translate(${P(m)})`);
+    sel.select('.bdg circle').attr('r',8*s); sel.select('.bdg text').attr('font-size',9.5*s).text(d.n>99?'99+':d.n);
+  });
+}
+function renderTies(){
+  const focus=selected||hovered, rows=[];
+  const ok=e=>e.w>=tieMin && ((axis==='clock'?e.t0:e.p0)??Infinity)<=t;
+  if(layer.ties) ties.forEach(e=>{ if(ok(e)) rows.push(e); });
+  else if(focus) focus.ties.slice(0,14).forEach(e=>{ if(ok(e)) rows.push(e); });
+  gTies.selectAll('path').data(rows,e=>e.a.i+'|'+e.b.i).join('path').attr('class','tie')
+    .attr('d',e=>`M${e.a.x.toFixed(1)},${(e.a.y+BY).toFixed(1)}L${e.b.x.toFixed(1)},${(e.b.y+BY).toFixed(1)}`)
+    .attr('opacity',e=>layer.ties&&!focus?0.25+0.75*Math.sqrt(e.w/TIE_MAX):0.9);
+}
+// ---- follow an item (transmission trees from the diffusion / authority detectors)
+const CASC=DATA.cascades||[];
+function followAdopted(){ if(!follow||axis!=='clock') return null; const s=new Set();
+  if(follow.first_ts<=t){ const o=tileOf.get(follow.origin); if(o) s.add(o); }
+  for(const e of follow.edges){ if(e.ts>t) continue; const a=tileOf.get(e.s), b=tileOf.get(e.t); if(a) s.add(a); if(b) s.add(b); }
+  return s; }
+function renderFollow(){
+  const s=1/zk, rows=[];
+  if(follow&&axis==='clock') for(const e of follow.edges){ if(e.ts>t) continue; const a=tileOf.get(e.s), b=tileOf.get(e.t); if(a&&b&&a!==b) rows.push({a,b,e}); }
+  const g=gFol.selectAll('g.fa').data(rows.slice(-260),d=>d.a.i+'>'+d.b.i+'@'+d.e.ts).join(en=>{const g=en.append('g').attr('class','fa'); g.append('path').attr('class','farc'); g.append('path').attr('class','fhead'); return g;});
+  g.each(function(d){ const a=topOf(d.a), b=topOf(d.b), c=quad(a,b,0.7), sel=d3.select(this), fresh=(t-d.e.ts)<WA*2;
+    sel.attr('opacity',fresh?1:0.45); sel.select('.farc').attr('d',`M${P(a)}Q${P(c)} ${P(b)}`).classed('inf',!!d.e.inf);
+    sel.select('.fhead').attr('d',arrowAt(a,c,b,6.5*s)); });
+}
+
+// ---- notes (blue callouts): story beats from the detectors, shown as the replay passes them
+const beats=[];
+if(HAS_CLOCK){
+  (DATA.milestones||[]).forEach(m=>beats.push({ts:m.ts,kind:'ms',lab:(ATTR?(/^Operator/.test(m.label)?'Operator':'Milestone'):'Milestone')+' · '+fmtShort(m.ts),text:m.label.replace(/^Operator:\s*/,'')}));
+  const h=DATA.headline||{};
+  if(h.claim) beats.push({ts:h.claim.ts,kind:'claim',anchor:tileOf.get('agent:'+h.claim.agent),lab:'Claim · '+fmtShort(h.claim.ts),
+    text:`${h.claim.agent} claims a privileged role ("${META.priv_role||'privileged'}") it was not given. ${h.claim.endorsers} agents went on to address it in that role.`});
+  if(h.drift_alert) beats.push({ts:h.drift_alert,kind:'drift',lab:'Memory alert · '+fmtShort(h.drift_alert),
+    text:'Agents’ own goal statements start naming roles they were not assigned (3+ agents within 30 minutes). The chat stays silent.'});
+  (DATA.clock_signals||[]).forEach(s=>{ const dayish=s.prec==='day'||s.ts%86400===0;
+    beats.push({ts:s.ts,kind:'sig',lab:'Signal · '+(dayish?iso(s.ts).slice(5,10)+' (date only?)':fmtShort(s.ts)),
+      text:`First ${SIG_NAME[s.sig]||s.sig} in the online replay. A lead to check, not a confirmed channel.`}); });
+}
+beats.sort((a,b)=>a.ts-b.ts);
+const notesEl=$('notes'), leadSvg=d3.select('#lead');
+function screenOf(p){ return [p[0]*zk+ztx, p[1]*zk+zty]; }
+const MOBILE=()=>innerWidth<=820;
+function mapLeft(){ const v=MOBILE()?8:$('panel').classList.contains('closed')?84:470; $('app').style.setProperty('--mapl',v+'px'); return v; }
+function renderNotes(){
+  const L=Math.max((hi-lo)*0.04,WA*2);
+  let act=axis==='clock'?beats.filter(b=>b.ts<=t&&t<b.ts+L):[];
+  if(follow&&axis==='clock'&&follow.first_ts<=t&&t<follow.first_ts+L*1.5)
+    act.push({ts:follow.first_ts,kind:'follow',anchor:tileOf.get(follow.origin),lab:'Follow · '+follow.kind,text:`${follow.label}: first used by ${(tileOf.get(follow.origin)||{}).lab||'?'}. Orange arrows show who probably passed it on.`});
+  const seenA=new Set(); act=act.filter(b=>{ if(!b.anchor) return true; if(seenA.has(b.anchor)) return false; seenA.add(b.anchor); return true; }).slice(-3);
+  const W0=innerWidth, left=mapLeft();
+  let y=16;
+  const html=[], leads=[], placed=[];
+  act.slice().reverse().forEach((b,i)=>{
+    let x, yy;
+    if(b.anchor&&b.anchor.x!=null){ const [sx,sy]=screenOf(topOf(b.anchor));
+      x=Math.max(left,Math.min(W0-316,sx-370)); yy=Math.max(12,Math.min(innerHeight-260,sy-150));
+      if(sx-370<left) x=Math.min(W0-316,sx+60);
+      for(const p of placed) if(Math.abs(p[0]-x)<300&&Math.abs(p[1]-yy)<128) yy=p[1]+132;
+      const fromX=x<sx?x+300:x, fromY=yy+44, ex=sx+(x<sx?-6:6), ey=sy;
+      leads.push({d:`M${fromX},${fromY}h${x<sx?24:-24}L${ex},${ey}`, ex, ey, ang:Math.atan2(ey-fromY,ex-(fromX+(x<sx?24:-24)))});
+    } else { x=W0-316; yy=y; y+=132; for(const p of placed) if(Math.abs(p[0]-x)<300&&Math.abs(p[1]-yy)<128){ yy=p[1]+132; y=yy+132; } }
+    placed.push([x,yy]);
+    html.push(`<div class="note${i>0?' fade':''}" style="left:${x}px;top:${yy}px"><div class="nl">${esc(b.lab)}</div>${esc(b.text)}</div>`);
+  });
+  notesEl.innerHTML=html.join('');
+  leadSvg.selectAll('g').data(leads).join(en=>{const g=en.append('g'); g.append('path'); g.append('path').attr('class','hd'); return g;})
+    .each(function(d){ const g=d3.select(this); g.select('path').attr('d',d.d);
+      g.select('.hd').attr('d',`M${d.ex},${d.ey}l${-9*Math.cos(d.ang-0.45)},${-9*Math.sin(d.ang-0.45)}l${9*Math.cos(d.ang-0.45)-9*Math.cos(d.ang+0.45)},${9*Math.sin(d.ang-0.45)-9*Math.sin(d.ang+0.45)}Z`); });
+}
+
+let lastPanel=0;
+function render(force){
+  renderTiles(); renderTies(); renderArcs(); renderFollow(); renderNotes();
+  const now=performance.now();
+  if(force||now-lastPanel>220){ lastPanel=now; renderLive(); }
+  drawSpark();
+  $('tread').innerHTML = axis==='clock' ? `${iso(t).slice(0,10)}<br>${iso(t).slice(11,16)} UTC` : `#${nf(t)}<br>of ${nf(MAXPOS)}`;
+}
+
+// ======================================================================
+// 6. Zoom / pan / pick
+// ======================================================================
+let ztx=0,zty=0,kFit=1;
+const zoom=d3.zoom().scaleExtent([0.08,10]).on('start',()=>svg.classed('grabbing',true)).on('end',()=>svg.classed('grabbing',false))
+  .on('zoom',ev=>{ const tr=ev.transform; zk=tr.k; ztx=tr.x; zty=tr.y; zg.attr('transform',tr);
+    const sr=R*zk; svg.classed('show-lab',layer.labels||sr>=48).classed('show-av',sr>=40);
+    $('zread').textContent=Math.round(zk/kFit*100)+'%';
+    d3.selectAll('#g-isl .cap').style('font-size',(11.5/zk).toFixed(2)+'px').style('stroke-width',(3/zk).toFixed(2)+'px');
+    drawGrid(); renderArcs(); renderFollow(); renderNotes(); });
+svg.call(zoom).on('dblclick.zoom',null);
+function fit(animate){
+  const left=mapLeft(), top=MOBILE()?72:24, Wm=innerWidth-left-(MOBILE()?8:24), Hm=innerHeight-top-(MOBILE()?140:100);
+  const bw=bounds.x1-bounds.x0, bh=bounds.y1-bounds.y0+40;
+  kFit=Math.min(Wm/bw,Hm/bh,2.2);
+  const tr=d3.zoomIdentity.translate(left+Wm/2-kFit*(bounds.x0+bw/2), top+Hm/2-kFit*(bounds.y0+bh/2)).scale(kFit);
+  (animate&&!REDUCED?svg.transition().duration(450):svg).call(zoom.transform,tr);
+}
+$('zread').addEventListener('click',()=>fit(true));
+$('z-in').addEventListener('click',()=>svg.transition().duration(250).call(zoom.scaleBy,1.4));
+$('z-out').addEventListener('click',()=>svg.transition().duration(250).call(zoom.scaleBy,1/1.4));
+function focusOn(T){ if(!T) return; const left=mapLeft(), cx=left+(innerWidth-left)/2, cy=(innerHeight-90)/2, k=Math.max(zk,kFit*1.8);
+  svg.transition().duration(REDUCED?0:500).call(zoom.transform,d3.zoomIdentity.translate(cx-k*T.x,cy-k*T.y).scale(k)); }
+const tip=$('tip');
+tileSel.on('mouseenter',function(ev,T){ hovered=T; render(true); })
+  .on('mousemove',function(ev,T){
+    const c=countAt(T,t), recent=exIn(t-WA*3,t).filter(e=>e.s===T||e.d===T).length;
+    tip.innerHTML=`<div class="nm">${esc(T.lab)}</div><div class="sm">${nf(c)} of ${nf(T.total)} events so far${T.role?` · ${esc(T.role)}`:''}</div>`
+      +`<div class="sm">${T.isl.kind==='comm'?'island '+esc(T.isl.cap.toLowerCase()):esc(T.isl.cap.toLowerCase())}${recent?` · ${recent} exchanges now`:''}</div>`;
+    tip.style.opacity=1; const x=Math.min(innerWidth-270,ev.clientX+14); tip.style.left=x+'px'; tip.style.top=(ev.clientY+14)+'px'; })
+  .on('mouseleave',function(){ hovered=null; tip.style.opacity=0; render(true); })
+  .on('click',function(ev,T){ ev.stopPropagation(); select(T===selected?null:T); });
+svg.on('click',()=>{ if(selected) select(null); });
+
+// ======================================================================
+// 7. Panel views
+// ======================================================================
+const panel=$('panel');
+let view='world', tab='overview';
+const TITLES={world:'World',agents:'Agents',follow:'Follow an item',layers:'Layers',help:'How to read the map'};
+function openView(v){
+  if(v==='charts'){ toggleCharts(); return; }
+  if(view===v && !panel.classList.contains('closed') && v!=='world'){ /* keep */ }
+  view=v; panel.classList.remove('closed');
+  document.querySelectorAll('.rbtn[data-view]').forEach(b=>b.classList.toggle('on',b.dataset.view===v));
+  $('r-help').classList.toggle('on',v==='help');
+  $('p-eyebrow').textContent=TITLES[v]||v;
+  $('p-tabs').hidden=v!=='world';
+  ['v-world-overview','v-world-timeline','v-agents','v-follow','v-layers','v-help'].forEach(id=>$(id).hidden=true);
+  if(v==='world') $(tab==='overview'?'v-world-overview':'v-world-timeline').hidden=false; else $('v-'+v).hidden=false;
+  $('p-title').textContent = v==='world' ? WORLD_TITLE : v==='agents' ? (selected?selected.lab:`${tiles.length} plots · ${islands.length} islands`)
+    : v==='follow' ? `${CASC.length} items with a known spread` : v==='layers' ? 'What the map shows' : 'Legend and keys';
+  if(v==='agents') renderAgents(); if(v==='follow') renderFollowList(); if(v==='world') renderLive();
+  setTimeout(()=>{ renderNotes(); },0);
+}
+document.querySelectorAll('.rbtn[data-view]').forEach(b=>b.addEventListener('click',()=>openView(b.dataset.view)));
+$('r-help').addEventListener('click',()=>openView('help'));
+$('r-home').addEventListener('click',()=>{ openView('world'); fit(true); });
+$('p-close').addEventListener('click',()=>{ panel.classList.add('closed'); document.querySelectorAll('.rbtn').forEach(b=>b.classList.remove('on')); renderNotes(); });
+document.querySelectorAll('#p-tabs .tab').forEach(b=>b.addEventListener('click',()=>{ tab=b.dataset.tab;
+  document.querySelectorAll('#p-tabs .tab').forEach(x=>x.classList.toggle('on',x===b)); openView('world'); }));
+
+const src=META.source||'';
+const WORLD_TITLE = GENERIC ? 'Generic log (JSONL)' : ATTR ? `AI Village · ${META.village||src}` : src==='swarm_traces' ? 'Swarm Traces · the July 2026 swarm' : `${src} log`;
+const spanTxt = HAS_CLOCK ? dur(CLOCK.tmax-CLOCK.tmin) : 'no clock';
+function overviewHtml(){
+  const h=DATA.headline||{};
+  let lead;
+  if(GENERIC) lead=`<b>${bots.length}</b> actors wrote <b>${nf(META.n_events)}</b> events over <b>${spanTxt}</b>. An actor is whatever field the loader mapped to <span class="mono">actor</span>; it may not be an agent. Each hex is one actor; buildings grow with its events. ${ties.length?'Islands are communities of the address graph (label propagation, as in the paper).':'This log has no addresses between actors, so there are no ties and every actor sits on one island.'}`;
+  else if(ATTR) lead=`<b>${bots.length}</b> agents${hums.length?` and <b>${hums.length}</b> human viewer${hums.length>1?'s':''}`:''} wrote <b>${nf(META.n_events)}</b> events over <b>${spanTxt}</b>. Every event names its author and time, so nothing here is inferred.`
+    +` Each hex is one agent. Islands are communities of the <span class="mono">@</span>-address graph (label propagation, as in the paper)${islands.filter(I=>I.kind==='comm').length===1?'; here everyone forms one community, because all agents talk in one public room':''}. Buildings grow with each agent's events.`;
+  else lead=`<b>${nf(META.n_events)}</b> redacted records from a swarm. <b>${nf(bots.length)}</b> agents signed their work; after inference ${pct(META.named_total_frac)} of records carry a name and ${pct(META.dated_total_frac)} a date.`
+    +` Each hex is one named agent. Islands are communities of the shared-resource graph (label propagation, as in the paper). Blue arcs are hand-offs: an agent used a resource whose latest earlier user was another agent (an order, not proof that it read the other's data).`;
+  let s=`<p class="lead">${lead}</p>`;
+  s+=`<div class="card plinth stats" style="margin-bottom:18px"><div><div class="stat-n">${nf(bots.length)}</div><div class="stat-l">${WHO}</div></div>`
+    +`<div><div class="stat-n">${nf(META.n_events)}</div><div class="stat-l">events</div></div>`
+    +`<div><div class="stat-n">${islands.length}</div><div class="stat-l">islands</div></div></div>`;
+  s+=`<div class="rule-h">Islands · ${islands.length}</div><div class="tags">`
+    +islands.slice(0,14).map(I=>`<button class="tag" data-isl="${I.k}">${esc(I.kind==='comm'?I.cap.split(' · ')[0].toLowerCase():I.kind==='viewers'?'human viewers':'no ties')} <span class="muted">${I.members.length}</span></button>`).join('')+(islands.length>14?`<span class="tag muted">+${islands.length-14}</span>`:'')+`</div>`;
+  // findings from the detectors
+  const F=[];
+  if(ATTR){
+    if(h.cp_total) F.push([`${h.cp_detected} of ${h.cp_total}`,`${h.ms_source||'milestones'} caught by the online chat change detector within 90 minutes (${h.cp_false} alerts with no milestone).`+(h.daily_flagged!=null?` The day-level check flags ${h.daily_flagged}, and ${Math.round(h.daily_precision*100)}% of its alert days follow one.`:'')]);
+    else if(h.cp_alerts!=null) F.push([`${h.cp_alerts} alerts`,`from the online chat change detector over ${h.days} days, with no announcements to score them against.`]);
+    if(h.claim) F.push([`${h.claim.agent}`,`claimed "${META.priv_role||'a privileged role'}" at ${iso(h.claim.ts).slice(11,16)} UTC without being assigned it; ${h.claim.endorsers} agents then addressed it in that role. Orange flag on the map.`]);
+    if(h.drift_alert) F.push([`${iso(h.drift_alert).slice(11,16)} UTC`,`role-drift alert from the agents' own memories, after a reshuffle the chat never mentioned`+(h.role_before!=null?` (role talk went from ${pct(h.role_before)} to ${pct(h.role_after)} of messages).`:'.')]);
+  } else {
+    const lp=h.lead_private||{};
+    if(lp.hf_worker_rce!=null) F.push([`${lp.hf_worker_rce} h`,`warning before the RCE on the Hugging Face worker, from the structure-only private-channel signal (${lp.hf_credentials_found} h before the credentials were found).`]);
+    if(h.first_alert_when) F.push([h.first_alert_when,`first multi-agent alert in the strict replay of ${nf(h.n_timed)} dated events`+(/00:00/.test(h.first_alert_when)?' (a board / mailbox write at exactly midnight, which may be a date with no time of day).':'.')]);
+    if(h.attr_precision!=null) F.push([`${Math.round(h.attr_precision*100)}% · ${h.date_within_24h!=null?Math.round(h.date_within_24h*100)+'%':'—'}`,`held-out precision of inferred names · inferred dates within 24 h. Dashed arcs rest on an inferred name.`]);
+  }
+  if(F.length) s+=`<div class="rule-h">Findings</div>`+F.map(([k,v])=>`<div class="finding"><div class="k">${esc(k)}</div><div class="t">${esc(v)}</div></div>`).join('');
+  s+=`<div class="rule-h">Latest</div><div id="live"></div>`;
+  return s;
+}
+function renderOverview(){ $('v-world-overview').innerHTML=overviewHtml();
+  $('v-world-overview').querySelectorAll('[data-isl]').forEach(b=>b.addEventListener('click',()=>{ const I=islands[+b.dataset.isl];
+    const xs=I.members.map(T=>T.x), ys=I.members.map(T=>T.y), left=mapLeft(), Wm=innerWidth-left-40, Hm=innerHeight-140;
+    const k=Math.min(Wm/(d3.max(xs)-d3.min(xs)+R*4),Hm/(d3.max(ys)-d3.min(ys)+R*4),kFit*4), cx=(d3.max(xs)+d3.min(xs))/2, cy=(d3.max(ys)+d3.min(ys))/2;
+    svg.transition().duration(REDUCED?0:500).call(zoom.transform,d3.zoomIdentity.translate(left+Wm/2-k*cx,20+Hm/2-k*cy).scale(k)); })); }
+function renderLive(){
+  const el=$('live'); if(!el||$('v-world-overview').hidden) { if(view==='world'&&tab==='timeline') renderTimeline(); if(view==='agents'&&selected) renderDetail(); return; }
+  const span=WA*4, ex=exIn(t-span,t), act=tiles.map(T=>[T,countIn(T,t-span,t)]).filter(x=>x[1]>0).sort((a,b)=>b[1]-a[1]);
+  const tot=d3.sum(act,x=>x[1]), msN=beats.filter(b=>b.ts>t-span&&b.ts<=t).length;
+  const busyWord=tot>0?'':' · quiet';
+  let s=`<div class="busy-line"><b>${nf(tot)}</b> events by <b>${act.length}</b> ${WHO} in the last ${axis==='clock'?dur(span):nf(span)+' positions'}${busyWord}</div>`;
+  s+=`<div class="busy-line"><b>${nf(ex.length)}</b> ${GENERIC?'addresses':ATTR?'@-addresses':'hand-offs'}${msN?` · <b>${msN}</b> milestone${msN>1?'s':''}`:''}</div>`;
+  if(act.length) s+=`<div class="busy-line">Busiest: ${act.slice(0,3).map(([T,c])=>`<span class="mono" style="color:var(--ink)">${esc(T.lab)}</span> <b>${nf(c)}</b>`).join(', ')}</div>`;
+  const recent=ex.slice(-7).reverse();
+  if(recent.length) s+=`<ul class="feed">`+recent.map(e=>`<li data-t="${e.s.i}">${ICO.msg}<span class="who">${esc(e.s.lab)} → <em>${esc(e.d.lab)}</em></span><span class="when">${axis==='clock'?fmtShort(e.ts):'#'+nf(e.pos)}</span>`
+    +`<span class="what">${ATTR?'@-addressed':'used a resource after'}${e.inf?' · inferred name':''}</span></li>`).join('')+`</ul>`;
+  else s+=`<div class="hint">No exchanges in this window. Press play, or drag the timeline in the dock.</div>`;
+  el.innerHTML=s;
+  el.querySelectorAll('[data-t]').forEach(li=>li.addEventListener('click',()=>{ select(tiles[+li.dataset.t]); }));
+}
+function renderTimeline(){
+  const el=$('v-world-timeline');
+  if(!beats.length){ el.innerHTML=`<p class="hint">No dated milestones or signals in this log.</p>`; return; }
+  let nowDone=false;
+  const rows=beats.map(b=>{ let pre='';
+    if(!nowDone&&b.ts>t){ nowDone=true; pre=`<li class="now"><span></span><span class="who" style="color:var(--select)">now · ${axis==='clock'?fmtShort(t):''}</span><span></span></li>`; }
+    return pre+`<li class="${b.ts>t?'future':''}" data-ts="${b.ts}">${b.kind==='ms'?ICO.dot:b.kind==='sig'?ICO.bolt:ICO.flag}<span class="who">${esc(b.lab)}</span><span class="when">${b.ts>t?'+'+dur(b.ts-t):dur(t-b.ts)+' ago'}</span><span class="what">${esc(b.text)}</span></li>`; });
+  el.innerHTML=`<p class="hint" style="margin:0 0 10px">Milestones (dots), detector signals (bolts) and claims or alerts (flags). Click one to jump there.</p><ul class="feed">${rows.join('')}</ul>`;
+  el.querySelectorAll('[data-ts]').forEach(li=>li.addEventListener('click',()=>{ pause(); const ts=+li.dataset.ts; if(ts<lo||ts>hi){ range='all'; applyRange(); } setT(ts+60); }));
+}
+
+// ---- agents
+let agentQ='';
+function renderAgents(){
+  const el=$('v-agents');
+  let s=selected?detailHtml(selected):`<p class="hint" style="margin-top:0">Click a plot on the map, or pick an agent below. Stop the replay at any moment to see what an agent had done by then.</p>`;
+  s+=`<div class="rule-h" style="margin-top:${selected?18:4}px">All agents · ${tiles.length}</div><input class="search" id="aq" placeholder="Filter by name…" value="${esc(agentQ)}">`;
+  s+=`<ul class="alist" id="alist"></ul>`;
+  el.innerHTML=s; listAgents();
+  $('aq').addEventListener('input',e=>{agentQ=e.target.value; listAgents();});
+  el.querySelectorAll('[data-res]').forEach(b=>b.addEventListener('click',()=>{ const id=b.dataset.res; const users=new Set(DATA.links.filter(l=>l.t===id).map(l=>tileOf.get(l.s)).filter(Boolean));
+    tiles.forEach(T=>T.el.g.classList.toggle('tied',users.has(T)&&T!==selected)); }));
+}
+function listAgents(){
+  const q=agentQ.trim().toLowerCase();
+  const L=tiles.filter(T=>!q||T.lab.toLowerCase().includes(q)).sort((a,b)=>countAt(b,t)-countAt(a,t)||b.total-a.total).slice(0,250);
+  $('alist').innerHTML=L.map(T=>`<li data-i="${T.i}" class="${T===selected?'on':''}">${avatarSvg(T)}<span class="nm">${esc(T.lab)}</span><span class="ct">${nf(countAt(T,t))}</span></li>`).join('');
+  $('alist').querySelectorAll('li').forEach(li=>li.addEventListener('click',()=>{ select(tiles[+li.dataset.i]); focusOn(tiles[+li.dataset.i]); }));
+}
+function detailHtml(T){
+  const n=T.nodes[0], rows=[['events so far',`${nf(countAt(T,t))} of ${nf(T.total)}`]];
+  if(T.kind==='viewers') rows.push(['viewers',nf(T.nodes.length)]);
+  if(T.t0!=null) rows.push(['first seen',fmtTime(T.t0)]);
+  const tn=d3.max(T.nodes,x=>x.tn); if(tn!=null&&tn!==T.t0) rows.push(['last seen',fmtTime(tn)]);
+  if(!ATTR&&T.kind==='agent') rows.push(['signed / inferred',`${nf(n.obs||0)} / ${nf(n.inf||0)}`]);
+  if(T.role) rows.push([ATTR?'assigned role':'main tactic',T.role]);
+  if(ATTR&&T.kind==='agent') rows.push(['authority',['—','claimed a role it was not given','assigned holder of the role'][T.status]||'—']);
+  if(n.spec!=null) rows.push(['specialisation',n.spec]);
+  if(n.led) rows.push(['led / followed',`${n.led} / ${n.fol||0}`]);
+  if(n.betw) rows.push(['betweenness',n.betw]);
+  rows.push(['island',T.isl.cap.toLowerCase()]);
+  rows.push([ATTR?'talks with':'shares with',`${T.ties.length} agents`]);
+  let s=`<div class="dcard"><div class="top">${avatarSvg(T,44)}<div><div class="nm">${esc(T.lab)}</div><div class="muted small">${T.kind==='agent'?'agent':T.kind==='viewers'?'human viewers (one plot)':'human viewer'}</div></div></div>`
+    +`<div class="kv">${rows.map(([k,v])=>`<div>${esc(k)}</div><div>${esc(v)}</div>`).join('')}</div>`;
+  if((n.tac||[]).length) s+=`<div style="margin-top:8px" class="small muted">tactics</div>${n.tac.map(m=>`<span class="pill">${esc(m)}</span>`).join('')}`;
+  if(T.mech.length) s+=`<div style="margin-top:8px" class="small muted">top mechanisms</div>${T.mech.map(m=>`<span class="pill">${esc(m)}</span>`).join('')}`;
+  const top=T.ties.slice(0,6).map(e=>e.a===T?e.b:e.a);
+  if(top.length) s+=`<div style="margin-top:8px" class="small muted">${ATTR?'talks most with':'closest ties'} (dashed on the map)</div>${top.map(N=>`<span class="pill">${esc(N.lab)}</span>`).join('')}`;
+  const res=T.kind==='agent'?DATA.links.filter(l=>l.s===T.id&&nodeById.has(l.t)&&nodeById.get(l.t).ty!=='agent').sort((a,b)=>b.w-a.w).slice(0,8):[];
+  if(res.length) s+=`<div style="margin-top:8px" class="small muted">resources it used (click: who else used it)</div><div class="tags" style="margin-top:4px">${res.map(l=>`<button class="tag" data-res="${esc(l.t)}" title="${esc(l.t)}">${esc(nodeById.get(l.t).lab.slice(0,26))} <span class="muted">${l.w}</span></button>`).join('')}</div>`;
+  s+=trailHtml(T);
+  if(VIEWS&&T.kind!=='viewers') s+=`<div style="margin-top:10px"><a class="tag" href="${esc(graphUrl(T))}" style="text-decoration:none">Open in the graph view (resources it used) →</a></div>`;
+  s+=`</div>`;
+  return s;
+}
+const TRAIL_SHOW=14;
+function trailHtml(T){
+  const ev=[].concat(...T.nodes.map(n=>n.ev||[])); if(!ev.length) return '';
+  const upTo=ev.filter(r=>axis==='clock'?(r[0]!=null&&r[0]<=t):r[1]<=t).sort((a,b)=>axis==='clock'?a[0]-b[0]:a[1]-b[1]);
+  const head=`<div style="margin-top:10px" class="small muted">what it did · ${upTo.length} events up to ${axis==='clock'?fmtTime(t):'this point'}${T.scale>1?' (a sample)':''}</div>`;
+  if(!upTo.length) return head+`<div class="hint">Nothing yet at this moment.</div>`;
+  return head+`<div class="trail">`+upTo.slice(-TRAIL_SHOW).reverse().map(r=>{
+    const when=r[0]!=null?fmtTime(r[0]).slice(5,16):`#${r[1]}`, to=(r[4]||[]).length?` → ${r[4].join(', ')}`:'';
+    return `<div class="trow${r[6]?' inf':''}"><span class="mono muted">${esc(when)}</span> <b>${esc(r[2])}</b>${r[3]?' · '+esc(r[3]):''}${esc(to)} ${(r[5]||[]).slice(0,3).map(f=>`<span class="pill">${esc(f)}</span>`).join('')}</div>`; }).join('')+`</div>`;
+}
+function renderDetail(){ if(view!=='agents') return; const d=document.querySelector('#v-agents .dcard'); if(d&&selected){ d.outerHTML=detailHtml(selected); } }
+function select(T){ selected=T; if(T){ openView('agents'); } else if(view==='agents'){ renderAgents(); $('p-title').textContent=`${tiles.length} plots · ${islands.length} islands`; } render(true); }
+
+// ---- follow
+function renderFollowList(){
+  const el=$('v-follow');
+  if(!CASC.length||!HAS_CLOCK){ el.innerHTML=`<p class="hint">No items with a reconstructed spread in this log.</p>`; return; }
+  el.innerHTML=`<p class="hint" style="margin-top:0">Pick an item: ${ATTR?'a file, commit, coined term or role claim':'a credential or dead-drop'}. Orange arrows appear as each agent adopts it; plots that never adopt it fade.`
+    +` ${ATTR?'An arrow goes from the earlier user who last @-addressed the adopter, else the latest earlier user, so it is reliable only when the item followed an address.':'A dead-drop hides direction, so each arrow is an order (latest earlier user), not proof; dashed = the adopter was named by inference.'}</p>`
+    +CASC.map((c,i)=>`<button class="ccard${follow===c?' on':''}" data-c="${i}"><div class="kd">${esc(c.kind)} · ${c.reach} agents</div><div class="lb">${esc(c.label)}</div><div class="small muted">first: ${esc((tileOf.get(c.origin)||{}).lab||c.origin.replace(/^agent:/,''))} · ${fmtShort(c.first_ts)}</div></button>`).join('');
+  el.querySelectorAll('[data-c]').forEach(b=>b.addEventListener('click',()=>setFollow(+b.dataset.c)));
+}
+function setFollow(i){ const c=i==null?null:CASC[i]; follow=(c&&follow===c)?null:c;
+  if(follow){ if(axis!=='clock'){ axis='clock'; applyAxis(); } if(follow.first_ts<lo||follow.first_ts>hi){ range='all'; applyRange(); } setT(follow.first_ts); }
+  renderFollowList(); render(true); }
+
+// ---- layers
+function renderLayers(){
+  const el=$('v-layers');
+  let s='';
+  s+=`<div class="rule-h">Time</div><div class="seg"><button id="ax-c">Real clock</button><button id="ax-d">Discovery order</button></div>`;
+  s+=`<div style="margin-top:8px" id="rg-wrap"><div class="seg"><button id="rg-w">${ATTR?'Main period':'Incident week'}</button><button id="rg-a">All dates</button></div></div>`;
+  s+=`<div class="hint" id="ax-hint"></div>`;
+  s+=`<div class="rule-h">Reveal</div><div class="seg"><button id="tm-c">Cumulative</button><button id="tm-w">Sliding window</button></div><div class="hint">Cumulative: a plot is built once its agent first acts. Sliding window: only agents active in the last ${axis==='clock'?dur(W):nf(W)+' positions'} keep a building.</div>`;
+  s+=`<div class="rule-h">Layers</div>`
+    +`<label class="chk"><input type="checkbox" data-ly="arcs"> exchanges in the last ${axis==='clock'?dur(WA):'stretch'} (blue arcs; badge = count)</label>`
+    +`<label class="chk"><input type="checkbox" data-ly="heat"> who is busy now (orange plots)</label>`
+    +`<label class="chk"><input type="checkbox" data-ly="ties"> all ties (dashed)</label>`
+    +`<label class="chk"><input type="checkbox" data-ly="labels"> names at every zoom</label>`;
+  if(!ATTR) s+=`<label class="chk"><input type="checkbox" id="k-inf"> include inferred authors (dashed arcs)</label>`;
+  s+=`<div class="rule-h">Minimum tie strength</div><input type="range" id="tie" min="0" max="100" value="${Math.round(tieMin/TIE_MAX*100)}"><div class="hint" id="tie-read"></div>`
+    +`<div class="hint">${ATTR?'Tie strength = number of @-addresses between two agents.':'Tie strength = Adamic–Adar score: a resource everyone uses adds little, one only two agents share adds a lot.'}</div>`;
+  if((DATA.covert||[]).length) s+=`<div class="rule-h">Highlight mechanism</div><select class="sel" id="mech"><option value="">— none —</option>${DATA.covert.map(r=>`<option value="${esc(r.mechanism)}"${mech===r.mechanism?' selected':''}>${esc(r.mechanism)} (${nf(r.n_events)})</option>`).join('')}</select><div class="hint">Agents that used it get an orange outline; the rest fade.</div>`;
+  el.innerHTML=s;
+  const segOn=(a,b,on)=>{ $(a).classList.toggle('on',on); $(b).classList.toggle('on',!on); };
+  const sync=()=>{ segOn('ax-c','ax-d',axis==='clock'); $('rg-wrap').hidden=axis!=='clock'; segOn('rg-w','rg-a',range==='week'); segOn('tm-c','tm-w',timeMode==='cumulative');
+    $('ax-hint').textContent=axis==='clock'?(ATTR?'Real time, read from the log (every event has one).':`Real time. Only dated events: dates read from the data plus inferred dates (${pct(META.dated_total_frac)} of events).`)
+      :'Every event, in the order the reconstruction found its resources. Not a clock: a held-out test showed it predicts time worse than guessing the median day.';
+    el.querySelectorAll('[data-ly]').forEach(c=>c.checked=layer[c.dataset.ly]); if($('k-inf')) $('k-inf').checked=showInf; };
+  $('ax-c').disabled=!HAS_CLOCK;
+  $('ax-c').onclick=()=>{ if(!HAS_CLOCK) return; axis='clock'; applyAxis(); sync(); };
+  $('ax-d').onclick=()=>{ axis='discovery'; applyAxis(); sync(); };
+  $('rg-w').onclick=()=>{ range='week'; applyRange(); sync(); };
+  $('rg-a').onclick=()=>{ range='all'; applyRange(); sync(); };
+  $('tm-c').onclick=()=>{ timeMode='cumulative'; sync(); render(true); };
+  $('tm-w').onclick=()=>{ timeMode='window'; sync(); render(true); };
+  el.querySelectorAll('[data-ly]').forEach(c=>c.addEventListener('change',()=>setLayer(c.dataset.ly,c.checked)));
+  if($('k-inf')) $('k-inf').addEventListener('change',e=>{ showInf=e.target.checked; render(true); });
+  const tr=$('tie'), upd=()=>{ tieMin=tr.value/100*TIE_MAX; $('tie-read').textContent=`≥ ${tieMin.toFixed(2)} · ${ties.filter(e=>e.w>=tieMin).length.toLocaleString()} of ${ties.length.toLocaleString()} ties`; render(true); };
+  tr.addEventListener('input',upd); upd();
+  if($('mech')) $('mech').addEventListener('change',e=>{ mech=e.target.value; render(true); });
+  sync();
+}
+function renderHelp(){
+  const hx=(cls,extra='')=>`<svg viewBox="-24 -16 48 32"><path class="${cls}" d="${hexD(0,0,0.5)}" style="${extra}"/></svg>`;
+  $('v-help').innerHTML=`<div class="legend">`
+    +`<svg viewBox="-24 -22 48 34"><path d="${hexD(0,0,0.5)}" fill="var(--paper)" stroke="var(--frame)"/><g transform="scale(.5)"><path class="bf b-l" d="${bld(26).l}"/><path class="bf b-r" d="${bld(26).r}"/><path class="bf b-top" d="${bld(26).t}"/></g></svg><div>one agent; the building grows with its events so far (log scale)</div>`
+    +`<svg viewBox="-24 -16 48 32"><path d="${stakeD}" transform="scale(.6)" class="stake"/></svg><div>an agent that has not acted yet at this moment</div>`
+    +`<svg viewBox="0 0 44 30"><path d="M4 24Q22 0 40 22" class="arc"/><path d="M40 22l-6-1 3-4z" class="ahead"/></svg><div>${ATTR?'an @-address':'a hand-off through a shared resource (latest earlier user → next user)'} in the last moments of the replay; a number = several</div>`
+    +`<svg viewBox="0 0 44 30"><path d="M4 24Q22 0 40 22" class="arc inf"/></svg><div>the same, resting on an inferred name</div>`
+    +`<svg viewBox="0 0 44 30"><path d="M4 18L40 12" class="tie"/></svg><div>a lasting tie (${ATTR?'agents that address each other':'agents that share rare resources'})</div>`
+    +`<svg viewBox="-24 -16 48 32"><path d="${hexD(0,0,0.5)}" fill="var(--act-wash)" stroke="var(--act)" stroke-dasharray="4 3"/></svg><div>busy now: among the most active agents of the last ${axis==='clock'?dur(WA*2):'stretch'}</div>`
+    +`<svg viewBox="0 0 44 30"><path d="M22 26V6l12 4-12 4" class="flag hold" fill="var(--select)"/></svg><div>assigned holder of a privileged role</div>`
+    +`<svg viewBox="0 0 44 30"><path d="M22 26V6l12 4-12 4" class="flag claim" fill="var(--act)"/></svg><div>claimed a privileged role it was not given</div>`
+    +`<svg viewBox="0 0 44 30"><path d="M4 24Q22 0 40 22" class="farc"/><path d="M40 22l-6-1 3-4z" class="fhead"/></svg><div>followed item: probable source → adopter</div>`
+    +`</div><div class="rule-h" style="margin-top:20px">Keys</div><div class="small muted">Space: play or pause · ←/→: step · ⌘K or Ctrl-K: search · Esc: clear · drag to pan, scroll to zoom, click the zoom % to fit.</div>`
+    +`<div class="rule-h">Islands</div><div class="small muted">Islands are the pipeline's communities (label propagation on the ${ATTR?'@-address':'shared-resource'} graph, as in the paper). Agents with no ties share one island; ${AGG?'human viewers share one plot':'human viewers sit on their own island'}. Placement is a layout, not a measurement: where an island sits, and where a plot sits inside it, only packs tied agents near each other. For distances and the resources behind each tie, use the graph view.</div>`;
+}
+
+// ======================================================================
+// 8. Dock: layers, play, spark timeline
+// ======================================================================
+function setLayer(k,on){ layer[k]=on; $('d-'+k).classList.toggle('on',on);
+  if(k==='labels') svg.classed('show-lab',on||R*zk>=48);
+  if(!$('v-layers').hidden) $('v-layers').querySelectorAll('[data-ly]').forEach(c=>c.checked=layer[c.dataset.ly]);
+  render(true); }
+['arcs','heat','ties','labels'].forEach(k=>$('d-'+k).addEventListener('click',()=>setLayer(k,!layer[k])));
+const spark=$('spark'), DPR=Math.min(2,window.devicePixelRatio||1);
+const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+let sparkBins=null;
+function buildSpark(){
+  const w=spark.clientWidth||300, nb=Math.max(12,Math.min(Math.floor(w/3),axis==='clock'?Math.ceil((hi-lo)/3600):9999)), b=new Array(nb).fill(0);
+  if(axis==='clock'){ const hr=DATA.hourly||{obs:[],inf:[]};
+    for(let k=0;k<hr.obs.length;k++){ const ts=(hr.start_hour+k)*3600+1800; if(ts<lo||ts>hi) continue; b[Math.min(nb-1,Math.floor((ts-lo)/(hi-lo)*nb))]+=hr.obs[k]+(hr.inf[k]||0); } }
+  else { const d=(DATA.density||{}).all||[]; d.forEach((v,i)=>{ b[Math.min(nb-1,Math.floor(i/d.length*nb))]+=v; }); }
+  sparkBins=b;
+}
+function drawSpark(){
+  if(!sparkBins) buildSpark();
+  const w=spark.clientWidth, h=spark.clientHeight; if(!w) return;
+  if(spark.width!==Math.round(w*DPR)||spark.height!==Math.round(h*DPR)){ spark.width=Math.round(w*DPR); spark.height=Math.round(h*DPR); }
+  const g=spark.getContext('2d'); g.setTransform(DPR,0,0,DPR,0,0); g.clearRect(0,0,w,h);
+  const b=sparkBins, mx=Math.max(1,...b), bw=w/b.length, f=(t-lo)/((hi-lo)||1), cut=f*w;
+  const ink=css('--ink2'), faint=css('--faint'), sel=css('--select'), act=css('--act');
+  for(let i=0;i<b.length;i++){ if(!b[i]) continue; const bh=Math.max(1.5,Math.sqrt(b[i]/mx)*(h-8));
+    g.fillStyle=i*bw<cut?ink:faint; g.globalAlpha=i*bw<cut?0.75:0.5; g.fillRect(i*bw+0.5,h-bh-2,Math.max(1,bw-1.2),bh); }
+  g.globalAlpha=1;
+  if(axis==='clock'){ beats.forEach(bt=>{ if(bt.ts<lo||bt.ts>hi) return; const x=(bt.ts-lo)/(hi-lo)*w;
+    g.fillStyle=bt.kind==='ms'?ink:act; g.fillRect(x-0.75,0,1.5,bt.kind==='ms'?6:4); }); }
+  g.fillStyle=sel; g.fillRect(Math.max(0,Math.min(w-2,cut-1)),0,2,h);
+}
+function sparkSet(ev){ const r=spark.getBoundingClientRect(); setT(lo+Math.max(0,Math.min(1,(ev.clientX-r.left)/r.width))*(hi-lo)); }
+let sparkDrag=false;
+spark.addEventListener('pointerdown',ev=>{ sparkDrag=true; spark.setPointerCapture(ev.pointerId); pause(); sparkSet(ev); });
+spark.addEventListener('pointermove',ev=>{ if(sparkDrag) sparkSet(ev); });
+spark.addEventListener('pointerup',()=>{ sparkDrag=false; });
+function setT(v){ t=Math.max(lo,Math.min(hi,v)); render(); }
+const playIco=$('play-ico');
+function pause(){ playing=false; playIco.innerHTML='<path d="M8 5.5v13l10.5-6.5z"/>'; $('play').setAttribute('aria-label','Play'); }
+function play(){ if(t>=hi) t=lo; playing=true; playIco.innerHTML='<path d="M8 5.5v13M16 5.5v13"/>'; $('play').setAttribute('aria-label','Pause'); last=0; requestAnimationFrame(loop); }
+let last=0;
+function loop(ts){ if(!playing) return; if(!last) last=ts; const dt=Math.min(80,ts-last); last=ts;
+  setT(t+(hi-lo)*(dt/60000)*speed); if(t>=hi){ pause(); render(true); return; } requestAnimationFrame(loop); }
+$('play').addEventListener('click',()=>playing?pause():play());
+$('speed').addEventListener('change',e=>speed=+e.target.value);
+function applyRange(){ setBounds(); sparkBins=null; setT(Math.max(lo,Math.min(hi,t))); }
+function applyAxis(){ applyRange(); if(!$('v-layers').hidden) renderLayers(); render(true); }
+
+// ---- search palette (⌘K)
+const pal=$('pal'), palIn=$('pal-in'), palUl=$('pal-ul'); let palItems=[], palIdx=0;
+function openPal(){ pal.hidden=false; palIn.value=''; palIdx=0; palSearch(); palIn.focus(); }
+function closePal(){ pal.hidden=true; }
+function palSearch(){ const q=palIn.value.trim().toLowerCase();
+  const A=tiles.filter(T=>!q||T.lab.toLowerCase().includes(q)).sort((a,b)=>b.total-a.total).slice(0,8).map(T=>({k:'agent',l:T.lab,go:()=>{select(T);focusOn(T);}}));
+  const C=CASC.map((c,i)=>({k:c.kind,l:c.label,go:()=>{openView('follow'); setFollow(i);}})).filter(x=>!q||x.l.toLowerCase().includes(q)).slice(0,5);
+  const M=beats.filter(b=>!q||(b.lab+' '+b.text).toLowerCase().includes(q)).slice(0,6).map(b=>({k:b.kind==='ms'?'milestone':b.kind,l:b.text.slice(0,70),go:()=>{pause(); if(b.ts<lo||b.ts>hi){range='all';applyRange();} setT(b.ts+60);}}));
+  palItems=[...A,...C,...M]; palIdx=Math.min(palIdx,Math.max(0,palItems.length-1));
+  palUl.innerHTML=palItems.map((x,i)=>`<li data-i="${i}" class="${i===palIdx?'on':''}"><span class="k">${esc(x.k)}</span><span class="mono">${esc(x.l)}</span></li>`).join('')||'<li class="muted">No match</li>';
+  palUl.querySelectorAll('[data-i]').forEach(li=>li.addEventListener('click',()=>{ closePal(); palItems[+li.dataset.i].go(); })); }
+palIn.addEventListener('input',()=>{palIdx=0; palSearch();});
+palIn.addEventListener('keydown',e=>{ if(e.key==='ArrowDown'){palIdx=Math.min(palItems.length-1,palIdx+1); palSearch(); e.preventDefault();}
+  else if(e.key==='ArrowUp'){palIdx=Math.max(0,palIdx-1); palSearch(); e.preventDefault();}
+  else if(e.key==='Enter'&&palItems[palIdx]){ closePal(); palItems[palIdx].go(); }
+  else if(e.key==='Escape') closePal(); });
+pal.addEventListener('click',e=>{ if(e.target===pal) closePal(); });
+$('d-search').addEventListener('click',openPal);
+document.addEventListener('keydown',e=>{
+  if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){ e.preventDefault(); pal.hidden?openPal():closePal(); return; }
+  if(/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) return;
+  if(e.key===' '){ e.preventDefault(); playing?pause():play(); }
+  else if(e.key==='ArrowRight'){ pause(); setT(t+(hi-lo)/200); }
+  else if(e.key==='ArrowLeft'){ pause(); setT(t-(hi-lo)/200); }
+  else if(e.key==='Escape'){ if(!pal.hidden) closePal(); else if(follow) setFollow(null); else select(null); }
+});
+
+// ---- theme
+const root=document.documentElement;
+function setTheme(th){ if(th==='system') delete root.dataset.theme; else root.dataset.theme=th;
+  try{ localStorage.setItem('swarmscope-theme',th); }catch(_){}
+  document.querySelectorAll('#theme button').forEach(b=>b.classList.toggle('on',b.dataset.th===th)); drawSpark(); if(window.__fxRedraw) window.__fxRedraw(); }
+document.querySelectorAll('#theme button').forEach(b=>b.addEventListener('click',()=>setTheme(b.dataset.th)));
+let th0='system'; try{ th0=localStorage.getItem('swarmscope-theme')||'system'; }catch(_){}
+setTheme(th0);
+if(window.matchMedia) window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>drawSpark());
+
+// ---- the graph view of the same log (analysis: resources, distances), at the same moment
+const VIEWS=META.views||null;
+function graphUrl(T){ const s=T||selected; return `${VIEWS.graph}?axis=${axis}&t=${Math.round(t)}`+(s&&s.kind!=='viewers'?`&sel=${encodeURIComponent(s.id)}`:''); }
+if(VIEWS){ $('r-graph').hidden=false; $('r-graph').addEventListener('click',()=>{ location.href=graphUrl(); }); }
+// ---- charts overlay
+function toggleCharts(on){ const fx=$('fx'); on=on==null?fx.hidden:on; fx.hidden=!on; $('r-charts').classList.toggle('on',on); if(on&&window.__fxRender) window.__fxRender(); }
+$('fx-close').addEventListener('click',()=>toggleCharts(false));
+if(DATA.forensics) $('r-charts').hidden=false;
+window.__openCharts=n=>{ toggleCharts(true); if(n) setTimeout(()=>{ const c=document.querySelectorAll('#fx-charts > *')[n-1]; if(c) c.scrollIntoView({block:'start'}); },300); };
+
+// ======================================================================
+// 9. Go
+// ======================================================================
+setBounds(); t=hi;
+renderOverview(); renderLayers(); renderHelp();
+sparkBins=null;
+fit(false);
+openView(innerWidth<=820?'world':'world');
+if(innerWidth<=820) $('p-close').click();
+render(true);
+let rz; window.addEventListener('resize',()=>{ clearTimeout(rz); rz=setTimeout(()=>{ sparkBins=null; fit(false); render(true); },150); });
+// deep links: #coord (ties), #follow-<n>, #play, #fx, #fx-<n>; combine with "-" (e.g. #coord-follow-9-play)
+function applyHash(){ const parts=(location.hash||'').slice(1).split('-').filter(Boolean); if(!parts.length) return;
+  if(parts.includes('coord')) setLayer('ties',true);
+  const fi=parts.indexOf('follow'); if(fi>=0&&CASC[+parts[fi+1]]){ openView('follow'); follow=null; setFollow(+parts[fi+1]); }
+  if(parts.includes('play')) play();
+  const xi=parts.indexOf('fx'); if(xi>=0&&DATA.forensics) window.__openCharts(parseInt(parts[xi+1],10)||0); }
+window.addEventListener('hashchange',applyHash); setTimeout(applyHash,200);
+(function(){ const q=new URLSearchParams(location.search);
+  const ax=q.get('axis'); if(ax==='discovery'||(ax==='clock'&&HAS_CLOCK)){ if(ax!==axis){ axis=ax; applyAxis(); } }
+  const tv=parseFloat(q.get('t')); if(!isNaN(tv)){ if(axis==='clock'&&(tv<lo||tv>hi)){ range='all'; applyRange(); } setT(tv); }
+  const s=q.get('sel'); if(s&&tileOf.has(s)){ const T=tileOf.get(s); setTimeout(()=>{ select(T); focusOn(T); },250); } })();
+// test hook for automated screenshots: ?shot=select:<agent>|theme:dark|t:<frac>|view:<name>
+(function(){ const q=new URLSearchParams(location.search).get('shot'); if(!q) return; setTimeout(()=>{ q.split('|').forEach(c=>{ const [k,v]=c.split(':');
+  if(k==='select'){ const T=tiles.find(x=>x.lab===v); if(T){ select(T); focusOn(T);} }
+  else if(k==='theme') setTheme(v); else if(k==='t') setT(lo+(+v)*(hi-lo)); else if(k==='view') openView(v);
+  else if(k==='tab'){ document.querySelector(`#p-tabs [data-tab="${v}"]`).click(); } else if(k==='layer') setLayer(v,true); }); },300); })();
+})();
+</script>
+<script>
+/* Forensics charts (logs with named speakers): small multiples on one UTC clock. */
+(function(){
+"use strict";
+const F=DATA.forensics; if(!F) return;
+const ROLE=(DATA.meta||{}).priv_role||'the privileged role';
+const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const MS=(DATA.milestones||[]).filter(m=>m.short!=='start');
+const t0=DATA.clock.tmin, t1=DATA.clock.tmax;
+const hhmm=t=>(t1-t0)>3*86400?new Date(t*1000).toISOString().slice(5,16).replace('T',' '):new Date(t*1000).toISOString().slice(11,16);
+const cum=times=>{ const ts=times.slice().sort((a,b)=>a-b); const out=[[t0,0]]; ts.forEach((t,i)=>out.push([t,i+1])); out.push([t1,ts.length]); return out; };
+function chart(root,o){
+  const card=document.createElement('div'); card.className='fx-card'; root.appendChild(card);
+  chart.n=(chart.n||0)+1; o.title=o.title.replace(/^\d+ · /,`${chart.n} · `);
+  card.innerHTML=`<h3>${o.title}</h3><div class="sub">${o.sub}</div>`;
+  if(o.series.length>1){ const lg=document.createElement('div'); lg.className='fx-legend';
+    lg.innerHTML=o.series.map(s=>`<span><span class="sw${s.dash?' dash':''}" style="border-color:${css(s.c)}"></span>${s.name}</span>`).join(''); card.appendChild(lg); }
+  if(o.note){ const n=document.createElement('div'); n.className='fx-note'; n.textContent=o.note; card.appendChild(n); }
+  const W=Math.max(300,card.clientWidth-28), H=(o.h||170)+20, m={l:40,r:o.r||(W<560?84:118),t:42,b:22};
+  const svg=d3.select(card).append('svg').attr('viewBox',`0 0 ${W} ${H}`).attr('height',H).attr('role','img').attr('aria-label',o.title);
+  const x=d3.scaleUtc().domain([t0*1000,t1*1000]).range([m.l,W-m.r]);
+  const all=o.series.flatMap(s=>s.pts.map(p=>p[1])).concat(o.extra||[]);
+  const y=d3.scaleLinear().domain(o.ydom||[Math.min(0,d3.min(all)),d3.max(all)||1]).nice().range([H-m.b,m.t]);
+  const g=svg.append('g');
+  g.append('g').attr('transform',`translate(0,${H-m.b})`).call(d3.axisBottom(x).ticks(Math.min(10,W/90)).tickFormat(d3.utcFormat((t1-t0)>3*86400?'%b %d':'%H:%M')).tickSizeOuter(0))
+    .call(a=>a.select('.domain').attr('stroke',css('--line'))).call(a=>a.selectAll('line').attr('stroke',css('--line')));
+  g.append('g').attr('transform',`translate(${m.l},0)`).call(d3.axisLeft(y).ticks(4).tickFormat(o.yfmt||d3.format('~s')).tickSize(-(W-m.l-m.r)))
+    .call(a=>a.select('.domain').remove()).call(a=>a.selectAll('line').attr('stroke',css('--line')).attr('stroke-opacity',.6));
+  const ms=g.append('g').attr('class','ms');
+  MS.forEach((mm,i)=>{ const X=x(mm.ts*1000);
+    ms.append('line').attr('x1',X).attr('x2',X).attr('y1',(i%3)*11+2).attr('y2',H-m.b).attr('stroke',css('--ink')).attr('stroke-opacity',.35).attr('stroke-width',1.5);
+    if(MS.length<=8) ms.append('text').attr('x',X+3).attr('y',10+(i%3)*11).text(mm.short); });
+  (o.refs||[]).forEach(v=>g.append('line').attr('x1',m.l).attr('x2',W-m.r).attr('y1',y(v)).attr('y2',y(v)).attr('stroke',css('--muted')).attr('stroke-dasharray','3 3').attr('stroke-width',1));
+  if(o.bars){ const s=o.series[0], bw=Math.max(1,x((t0+o.bars)*1000)-x(t0*1000)-2);
+    g.append('g').selectAll('rect').data(s.pts).join('rect').attr('x',p=>x(p[0]*1000)-bw/2).attr('width',bw)
+      .attr('y',p=>y(p[1])).attr('height',p=>Math.max(0,y(0)-y(p[1]))).attr('rx',Math.min(4,bw/2)).attr('fill',css(s.c)); }
+  else o.series.forEach(s=>{ const line=(s.step?d3.line().curve(d3.curveStepAfter):d3.line()).x(p=>x(p[0]*1000)).y(p=>y(p[1])).defined(p=>p[1]!=null);
+    g.append('path').datum(s.pts).attr('fill','none').attr('stroke',css(s.c)).attr('stroke-width',2).attr('stroke-dasharray',s.dash?'5 3':null).attr('stroke-linejoin','round').attr('d',line); });
+  if(!o.bars){ const ends=o.series.map(s=>{const p=s.pts[s.pts.length-1]; return {s,y:y(p[1]),v:p[1]};}).sort((a,b)=>a.y-b.y);
+    for(let i=1;i<ends.length;i++) if(ends[i].y-ends[i-1].y<13) ends[i].y=ends[i-1].y+13;
+    ends.forEach(e=>g.append('text').attr('class','lab').attr('x',W-m.r+6).attr('y',e.y+4).text(`${e.s.short||e.s.name} ${o.endfmt?o.endfmt(e.v):''}`)); }
+  (o.marks||[]).forEach(t=>g.append('path').attr('d',d3.symbol(d3.symbolTriangle,70)()).attr('transform',`translate(${x(t*1000)},${m.t+2}) rotate(180)`).attr('fill',css('--alert')).attr('stroke',css('--panel')).attr('stroke-width',2));
+  const tip=document.createElement('div'); tip.className='fx-tip'; card.appendChild(tip);
+  const hair=g.append('line').attr('y1',m.t).attr('y2',H-m.b).attr('stroke',css('--muted')).attr('opacity',0);
+  const at=(pts,t)=>{ let v=null; for(const p of pts){ if(p[0]<=t) v=p; else break; } return v; };
+  const near=(pts,t)=>pts.reduce((b,p)=>Math.abs(p[0]-t)<Math.abs(b[0]-t)?p:b,pts[0]);
+  svg.append('rect').attr('x',m.l).attr('y',m.t).attr('width',W-m.l-m.r).attr('height',H-m.t-m.b).attr('fill','transparent')
+    .on('mousemove',ev=>{ const [mx]=d3.pointer(ev); const t=x.invert(mx)/1000; hair.attr('x1',mx).attr('x2',mx).attr('opacity',.6);
+      const rows=o.series.map(s=>{ const p=(s.step?at:near)(s.pts,t); return p?`<div><span style="display:inline-block;width:10px;height:0;border-top:2px solid ${css(s.c)};margin-right:5px;vertical-align:middle"></span>${s.name}: <b>${o.tipfmt?o.tipfmt(p):p[1]}</b></div>`:''; }).join('');
+      tip.innerHTML=`<div style="font:11.5px var(--f-mono);color:var(--muted)">${hhmm(t)} UTC</div>${rows}`; tip.style.opacity=1;
+      const r=card.getBoundingClientRect(), sr=svg.node().getBoundingClientRect(), px=sr.left-r.left+mx*sr.width/W;
+      tip.style.left=Math.min(px+12,r.width-tip.offsetWidth-6)+'px'; tip.style.top=(sr.top-r.top+10)+'px'; })
+    .on('mouseleave',()=>{tip.style.opacity=0; hair.attr('opacity',0);});
+}
+let done=false;
+function render(){
+  if(done) return; done=true;
+  const root=document.getElementById('fx-charts'); root.innerHTML=''; chart.n=0;
+  const W0=root.clientWidth, C=['--s1','--s2','--s3'];
+  if(F.cp&&F.cp.series.length) chart(root,{title:'1 · Did the chat change? (online change detector)',
+    sub:`Every 10 minutes: how unusual the last 30 minutes are, compared with the 2 hours before. Topic = which words agents use; volume = how many messages. An alert (red triangle) fires at a score of ${F.cp.z} or more.`,
+    series:[{name:'topic change',short:'topic',c:C[0],pts:F.cp.series.map(r=>[r[0],r[1]])},{name:'volume change',short:'volume',c:C[1],pts:F.cp.series.map(r=>[r[0],r[2]])}],
+    refs:[F.cp.z,-F.cp.z], marks:F.cp.alerts, yfmt:d3.format('~f'), tipfmt:p=>p[1].toFixed(1),
+    note:(()=>{ const h=DATA.headline||{}, rows=(h.cp_rows||[]); if(!rows.length) return '';
+      const lab=i=>(MS[i]||{}).short||`message ${i+2}`;
+      const hit=rows.map((r,i)=>r[1]?`${lab(i)} (${Math.round(r[2])} min later)`:null).filter(Boolean), miss=rows.map((r,i)=>r[1]?null:lab(i)).filter(Boolean);
+      if(rows.length>8) return `Caught ${hit.length} of ${rows.length} milestones within 90 minutes.`+(F.daily&&F.daily.flagged!=null?' See the next chart for the day-level check.':'');
+      return `Caught: ${hit.join(', ')||'none'}. Missed: ${miss.join(', ')||'none'}.`; })()});
+  if(F.daily&&F.daily.series&&F.daily.series.length){ const d=F.daily;
+    chart(root,{title:'2 · Did the topic change from day to day? (day-level check)',
+      sub:`Each active day is compared with the ${d.ref_days} active days before it (which words agents use). Red triangle: alert day (score of ${d.z} or more). Grey lines: milestones.`,
+      series:[{name:'day-to-day topic change',short:'topic',c:C[0],pts:d.series}], refs:[d.z], marks:d.alerts, yfmt:d3.format('~f'), tipfmt:p=>p[1].toFixed(1),
+      note:d.flagged!=null?`Flags ${d.flagged} of ${d.milestones} milestones within their first ${d.lag} active days (${Math.round(d.recall*100)}%, against ${Math.round(d.chance*100)}% for any day). ${Math.round(d.precision*100)}% of alert days fall right after a milestone.`:''}); }
+  if(F.roles&&F.roles.length) chart(root,{title:'2 · Did the agents notice the role reshuffle?',
+    sub:'Share of agent messages in each 30-minute slot that mention "role" or "roles". If agents had noticed that their roles changed, this would rise after "phase 2 (repeat)".',
+    series:[{name:'messages that mention a role',c:C[0],pts:F.roles.map(r=>[r[0],r[1],r[2]])}], bars:1800,
+    yfmt:d3.format('.0%'), ydom:[0,Math.max(.1,d3.max(F.roles,r=>r[1]))], r:(W0<560?70:96), tipfmt:p=>`${(p[1]*100).toFixed(0)}% of ${p[2]} messages`,
+    note:(()=>{ const rep=MS.find(mm=>/repeat/.test(mm.short)); if(!rep) return '';
+      const avg=(a,b)=>{ const r=F.roles.filter(x=>x[0]>=a&&x[0]<b); const n=d3.sum(r,x=>x[2]); return n?d3.sum(r,x=>x[1]*x[2])/n:0; };
+      const b=avg(rep.ts-3*3600,rep.ts), a=avg(rep.ts,rep.ts+3*3600);
+      return `3 hours before "${rep.short}": ${(b*100).toFixed(0)}% of messages mention a role. 3 hours after: ${(a*100).toFixed(0)}%. No rise, so the agents did not notice. (Role talk also fades by itself once roles settle.)`; })()});
+  if(F.drift&&F.drift.series.length) chart(root,{title:'3 · Did the agents’ own goals change? (memories and work-session goals)',
+    sub:'Share of statements in which an agent quotes its own goal ("Play your assigned role: …") and names a role it was NOT assigned. Red triangle: online alert (3 or more agents within 30 minutes).',
+    series:[{name:'statements naming another role',c:C[1],pts:F.drift.series.map(r=>[r[0],r[2]/r[1],r[1],r[2]])}], bars:1800,
+    yfmt:d3.format('.0%'), ydom:[0,1], r:(W0<560?70:96), marks:F.drift.alert?[F.drift.alert]:[], tipfmt:p=>`${p[3]} of ${p[2]} statements (${(p[1]*100).toFixed(0)}%)`,
+    note:(()=>{ if(!F.drift.alert) return ''; const rep=MS.filter(mm=>mm.ts<=F.drift.alert).pop(); const b=F.drift.before||{};
+      return `Alert at ${hhmm(F.drift.alert)} UTC`+(rep?`, ${Math.round((F.drift.alert-rep.ts)/60)} min after "${rep.short}"`:'')+`. Before it, ${b.mismatching||0} of ${b.statements||0} statements named another role. ${F.drift.agents} agents drifted. The chat (previous chart) stayed silent; the agents' private notes did not.`; })()});
+  if(F.claims&&F.claims.length) chart(root,{title:`4 · Who did the swarm treat as "${ROLE}"?`,
+    sub:`Running count of distinct agents that addressed each claimant (@name) in a message about "${ROLE}". Only one agent was assigned the role.`,
+    series:F.claims.map((c,i)=>({name:c.name,short:c.name.split(' ')[0],c:C[i%3],step:true,dash:/\(assigned/.test(c.name),pts:cum(c.times)})), endfmt:v=>v, tipfmt:p=>`${p[1]} agents`,
+    note:(()=>{ const h=(DATA.headline||{}).claim; if(!h) return ''; const real=F.claims.find(c=>/\(assigned/.test(c.name));
+      return `${h.agent} was not assigned the role, claimed it at ${hhmm(h.ts)} UTC, and was then addressed as ${ROLE} by ${h.endorsers} agents`+(real?` (the assigned holder: ${real.times.length}).`:'.'); })()});
+  if(F.spread&&F.spread.length) chart(root,{title:'5 · How fast did information spread?',
+    sub:'Running count of distinct agents that used each item for the first time: the most widely used file, commit, and coined term.',
+    series:F.spread.map((c,i)=>({name:c.name,short:c.name.split(' ')[0],c:C[i%3],step:true,pts:cum(c.times)})), endfmt:v=>v, tipfmt:p=>`${p[1]} agents`});
+}
+window.__fxRender=render;
+window.__fxRedraw=()=>{ if(!document.getElementById('fx').hidden){ done=false; render(); } };
+let rt; window.addEventListener('resize',()=>{ if(document.getElementById('fx').hidden) return; clearTimeout(rt); rt=setTimeout(()=>{done=false; render();},200); });
+})();
+</script>

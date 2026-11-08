@@ -127,7 +127,7 @@ Each agent's messages per 60-minute bin, split at its median; the group total li
 
 | group | transitions | practical S | synergy (minus null median) | redundancy |
 | --- | --- | --- | --- | --- |
-| most active group | 859 | -0.087 (p 0.8159) | +0.0133 (p 0.0149) | +0.0094 (p 0.0498) |
+| most active group | 859 | -0.0887 (p 0.8209) | +0.0133 (p 0.0149) | +0.0094 (p 0.0498) |
 | random group 1 | 544 | -0.1377 (p 0.995) | +0.0131 (p 0.005) | +0.0147 (p 0.005) |
 | random group 2 | 546 | -0.0213 (p 0.602) | +0.0062 (p 0.0846) | +0.0057 (p 0.0945) |
 | random group 3 | 267 | -0.058 (p 0.9652) | +0.0165 (p 0.005) | +0.0134 (p 0.005) |

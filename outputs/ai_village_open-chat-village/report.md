@@ -4,7 +4,7 @@
 - Agents who spoke: **23**; chat messages: **47,747** (12,264 by humans); rooms: 1 (largest holds 100.0%); time span: **66 days** (Aug 25 20:03 to Oct 31 00:10 UTC)
 - Every event names its author and has a real time, so no inference is needed. A message that writes `@name` is an edge from the speaker to that agent. Humans appear only as anonymous ids (`human:` plus 8 characters).
 
-**No operator milestones.** Humans wrote 12,264 messages here (in this village, viewers chat with the agents), so human messages are not rare announcements and cannot serve as ground truth. Change-point alerts below are unlabelled.
+**No operator milestones.** Humans wrote 12,264 messages here (humans chat with the agents), so human messages are not rare announcements and cannot serve as ground truth. Change-point alerts below are unlabelled.
 
 ## 1. Who talked to whom
 
@@ -97,11 +97,11 @@ Each agent's messages per 60-minute bin, split at its median; the group total li
 | most active group | 318 | -0.3875 (p 1.0) | +0.0061 (p 0.199) | +0.0105 (p 0.1493) |
 | random group 1 | 220 | -0.3774 (p 1.0) | +0.0045 (p 0.2687) | +0.0022 (p 0.4279) |
 | random group 2 | 191 | -0.1372 (p 0.9552) | +0.0032 (p 0.2338) | +0.0033 (p 0.204) |
-| random group 3 | 192 | -0.198 (p 0.99) | +0.0098 (p 0.0945) | +0.0166 (p 0.0299) |
+| random group 3 | 192 | -0.1802 (p 0.9851) | +0.0098 (p 0.0945) | +0.0166 (p 0.0299) |
 | random group 4 | 220 | -0.1301 (p 0.995) | +0.0142 (p 0.0299) | +0.0121 (p 0.0299) |
 | random group 5 | 289 | -0.2539 (p 1.0) | +0.011 (p 0.0149) | +0.0162 (p 0.005) |
 | random group 6 | 192 | -0.1041 (p 0.8706) | +0.0005 (p 0.4577) | +0.006 (p 0.0348) |
-| random group 7 | 223 | -0.1422 (p 0.995) | +0.0056 (p 0.0597) | +0.0051 (p 0.0945) |
+| random group 7 | 223 | -0.1422 (p 1.0) | +0.0056 (p 0.0597) | +0.0051 (p 0.0945) |
 | random group 8 | 180 | -0.0656 (p 0.6169) | +0.0024 (p 0.2836) | +0.0099 (p 0.0149) |
 | random group 9 | 220 | -0.0531 (p 0.8408) | +0.012 (p 0.01) | +0.0177 (p 0.005) |
 | random group 10 | 101 | -0.1105 (p 0.3234) | +0.0114 (p 0.0149) | +0.0013 (p 0.3433) |

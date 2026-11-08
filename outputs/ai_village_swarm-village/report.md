@@ -95,7 +95,7 @@ Detected 1 of 4 operator announcements (within 90 min). Alerts that follow no an
 | alert (UTC) | why | z topic | z volume | new words | non-chat actions changed |
 | --- | --- | --- | --- | --- | --- |
 | Aug 30 02:16 | volume surge | 0.0 | 10.43 | modules, claim, content, building | - |
-| Aug 30 08:26 | topic shift | 4.05 | -2.02 | instruments, tools_bonus, quality_cap, next_id | search_history down 18->0/h; consolidate down 143->6/h |
+| Aug 30 08:26 | topic shift | 4.05 | -2.02 | instruments, tools_bonus, quality_cap, next_id | consolidate down 143->6/h; search_history down 18->0/h |
 | Aug 30 10:26 | topic shift | 8.87 | 1.08 | meridian, joining, town, home | - |
 
 **False-alarm load of the Swarm Traces signals.** No covert channel is known in this village, so each firing is at best a lead for an investigator:

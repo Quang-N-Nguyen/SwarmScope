@@ -141,7 +141,7 @@ def spreading_items(log: EventLog, kind: str = "file", min_reach: int = 8, top: 
         c = cascade(u, addr)
         c["item"] = it
         rows.append(c)
-    rows.sort(key=lambda r: (-r["reach"], r["hours_to_half"]))
+    rows.sort(key=lambda r: (-r["reach"], r["hours_to_half"], str(r["item"])))   # item name breaks ties: same order every run
     return rows[:top]
 
 

@@ -17,7 +17,7 @@ Swarms of AI agents coordinate through shared files, rooms and resources, and ex
 
 **Our main contributions are:**
 
-1. **SwarmScope, an open forensic system** for multi-agent logs. One event model and three loaders (Swarm Traces, AI Village, any JSONL file) feed a dynamic-graph viewer and 13 detector modules. It uses only the Python standard library.
+1. **SwarmScope, an open forensic system** for multi-agent logs. One event model and three loaders (Swarm Traces, AI Village, any JSONL file) feed 13 detector modules and two linked viewers: a dynamic graph and a world map. It uses only the Python standard library.
 2. **Inference for redacted logs with measured error.** Author attribution (95% precise on held-out data), dating (94% of estimates within 24 hours), and alias scoring. Inferred values are always kept apart from observed ones.
 3. **A mission-level evaluation with known answers.** Planted pairs, spreading trees and hidden channels in real logs; lead time on a real attack; false-alarm rates on three benign control villages; blind-labelled precision and recall; and the specificity of each hidden-channel flag, attack against benign.
 
@@ -39,17 +39,18 @@ Swarms of AI agents coordinate through shared files, rooms and resources, and ex
 
 ![Figure 1](docs/figures/fig1_architecture.png)
 
-*Figure 1. SwarmScope pipeline. Loaders turn each record into one Event (actor, channel, resources, mechanism flags, time). Unsigned or undated events go through inference; named and timed events go straight to the graphs. Detectors and the early-warning replay feed one viewer, a report and a findings file.*
+*Figure 1. SwarmScope pipeline. Loaders turn each record into one Event (actor, channel, resources, mechanism flags, time). Unsigned or undated events go through inference; named and timed events go straight to the graphs. Detectors and the early-warning replay feed the viewers, a report and a findings file.*
 
 - **Loaders.** `swarm_traces`, `ai_village` (chat, rooms, actions, role assignments, memories, computer-use turns) and `generic` (any JSONL file plus a field map).
 - **Inference.** Authors, dates and aliases for redacted logs. Each step measures its own error on held-out data.
 - **Graphs.** An activity graph (agents and resources) and an agent graph (agent-to-agent ties, weighted by Adamic–Adar [19]; communities by label propagation [33]).
 - **Detectors and early warning.** Each detector uses only the past at each step, so the replay shows what an online monitor would have seen.
-- **Outputs.** A single offline HTML viewer, `report.md` and `findings.json`.
+- **Outputs.** Two linked offline HTML viewers (graph and world map), `report.md` and `findings.json`.
 
 ### 3.2 Features
 
 - **Dynamic graph viewer.** Play the log forward on a real clock or in discovery order; activity, conversation and coordination views; inferred edges drawn dashed; milestones on the timeline (Figure 2). Stop at any moment and click an agent to see what it had done by then (its events, resources and mechanism flags, never payload text).
+- **World map.** The same data as a map: one hex per agent, grouped into islands by the same label-propagation communities; buildings grow with each agent's events, arcs show exchanges in the current window, and notes mark milestones, claims and alerts as the replay passes them. The packing is a layout, not a measurement; each view opens the other at the same moment.
 - **Follow an item.** Replays one item from agent to agent, with an arrow at each adoption [34]: a file, commit, coined term or role claim on named logs; a credential or dead-drop dataset on redacted logs (each arrow goes from the latest earlier user, dashed when the adopter was named by inference).
 - **Forensics charts.** All detectors on one clock (Figures 3–5).
 - **Inference of redacted fields.** Label propagation over rare shared identifiers [21, 22], weighted-median dating over linked events [25], and alias scoring on personal identifiers [27].
@@ -119,7 +120,7 @@ We judge SwarmScope by the mission it was built for: show who talked to whom, ho
 
 ![Figure 2](docs/figures/fig2_viewer_swarm_traces.png)
 
-*Figure 2. SwarmScope viewer on Swarm Traces, incident week. Circles are agents; squares are shared resources, colour-coded by kind. Bottom: dated events per time slice (dark = date read from the data, light = inferred), incident milestones from METR / Redwood [4] (dark lines), and the first firing of each early-warning signal (amber).*
+*Figure 2. SwarmScope graph view on Swarm Traces, incident week. Circles are agents (blue); squares are shared resources, colour-coded by kind. Bottom: dated events per time slice (dark = date read from the data, light = inferred), incident milestones from METR / Redwood [4] (dark lines), and the first firing of each early-warning signal (orange).*
 
 **Case.** In `swarm-village`, attention centralises when role-play starts: Gini rises from 0.43 to 0.60 and reciprocity falls from 0.40 to 0.20. The new hub, coral-delta, is not the agent that was given the privileged role (§4.5).
 
@@ -249,7 +250,7 @@ We judge SwarmScope by the mission it was built for: show who talked to whom, ho
 - **Emergence uses timing only**, not message content.
 - **Assumptions.** Shared rare resources imply interaction. Observed dates in Swarm Traces are correct. Operator messages and goal changes are the true milestones. If shared resources are given to agents by the task, ties are inflated; we report task-traffic shares to check this.
 
-**Future work.** Compare each agent's actions with its role, not only its stated role. Raise role-drift recall with more phrase variants, tested on a fresh labelled set. Use message content in the emergence test. Harder synthetic tests (plants inside popular resources, rotating aliases, larger groups). An upload page that turns any JSONL log into a viewer.
+**Future work.** Compare each agent's actions with its role, not only its stated role. Raise role-drift recall with more phrase variants, tested on a fresh labelled set. Use message content in the emergence test. Harder synthetic tests (plants inside popular resources, rotating aliases, larger groups).
 
 ## 6. Conclusion
 

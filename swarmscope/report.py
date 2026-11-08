@@ -760,7 +760,7 @@ def to_markdown(log: EventLog, f: dict) -> str:
         L.append(_md_table(["tactic", "techniques", "events", "agents"],
                            [(r["tactic"], "; ".join(r["techniques"]), f"{r['events']:,}", r["agents"]) for r in t["table"]]))
         L.append(f"\nRoles (each agent's main tactic, leaving out the board-token flag that every named "
-                 f"agent has by construction): " +
+                 f"agent has by construction; a tie goes to the tactic listed first in the table above): " +
                  ", ".join(f"{k} {v}" for k, v in t["role_counts"]) + ". Cover set: " +
                  ", ".join(t["cover_set"][:8]) + ".\n")
     ww = res.get("who_when", [])
@@ -843,7 +843,7 @@ def _blind_spots(log: EventLog, f: dict) -> str:
 
 
 def write_outputs(log: EventLog, findings: dict, out_dir: str,
-                  prefer_time: bool = True, title: str = None) -> dict:
+                  prefer_time: bool = True, title: str = None, link_views: bool = True) -> dict:
     os.makedirs(out_dir, exist_ok=True)
     fj = os.path.join(out_dir, "findings.json")
     with open(fj, "w") as fp:
@@ -852,6 +852,14 @@ def write_outputs(log: EventLog, findings: dict, out_dir: str,
     with open(md, "w") as fp:
         fp.write(to_markdown(log, findings))
     gd = export.build_graph_data(log, findings, prefer_time)
+    # Two viewers of the same data, linked to each other: the graph (agents
+    # and the resources they used; the analysis view) and the world map (one
+    # hex per agent, replayed over time; the overview).
     html = os.path.join(out_dir, f"swarmscope_{log.name}.html")
-    export.write_html(gd, html, title=title or f"SwarmScope {log.name.replace('_', ' ').title()}")
-    return dict(findings=fj, report=md, html=html)
+    world = os.path.join(out_dir, f"swarmscope_{log.name}_world.html")
+    if link_views:   # off when the pages are not served side by side (the in-browser workbench)
+        gd["meta"]["views"] = dict(graph=os.path.basename(html), world=os.path.basename(world))
+    name = title or f"SwarmScope {log.name.replace('_', ' ').title()}"
+    export.write_html(gd, html, title=name)
+    export.write_html(gd, world, title=name + " · world", template="world.html")
+    return dict(findings=fj, report=md, html=html, world=world)

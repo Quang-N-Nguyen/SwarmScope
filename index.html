@@ -103,6 +103,9 @@ tr:last-child td{border-bottom:0}
 .logs{display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:10px}
 .log{background:var(--surface); border:1px solid var(--line); border-radius:4px; padding:14px; display:grid; gap:6px; text-decoration:none; color:var(--ink)}
 .log:hover{border-color:var(--accent)}
+.log .go{display:flex; gap:14px; margin-top:4px; font:500 13px var(--mono)}
+.log .go a{color:var(--accent); text-decoration:none}
+.log .go a:hover{text-decoration:underline}
 .log b{font:600 15px var(--display)}
 .log span{font-size:13px; color:var(--muted)}
 .log em{font:500 12px var(--mono); font-style:normal; color:var(--accent)}
@@ -216,13 +219,13 @@ footer{font-size:13px; color:var(--muted); border-top:1px solid var(--line); pad
       </div>
       <p>The agent field is redacted and 3.1% of records are dated. A closed group of 2–3 agents reusing a non-task resource still fires 44.7 hours before the remote code execution on the Hugging Face worker.</p>
       <div class="btns">
-        <a class="btn primary" href="outputs/swarm_traces/swarmscope_swarm_traces.html#play" target="_blank" rel="noopener">Play the incident week</a>
+        <a class="btn primary" href="outputs/swarm_traces/swarmscope_swarm_traces_world.html#play" target="_blank" rel="noopener">Play the incident week</a>
         <a class="btn" href="outputs/swarm_traces/swarmscope_swarm_traces.html#coord" target="_blank" rel="noopener">Agent ties</a>
       </div>
     </div>
     <figure class="f-fig">
       <img src="docs/figures/fig2_viewer_swarm_traces.png" alt="SwarmScope viewer on Swarm Traces: agents as circles, shared resources as squares, a timeline of dated events with incident milestones and the first firing of each signal." loading="lazy">
-      <figcaption>The viewer on Swarm Traces. Amber chips mark the first firing of each signal; dark lines are incident milestones.</figcaption>
+      <figcaption>The graph view on Swarm Traces. Orange chips mark the first firing of each signal; dark lines are incident milestones.</figcaption>
     </figure>
   </article>
 
@@ -237,8 +240,8 @@ footer{font-size:13px; color:var(--muted); border-top:1px solid var(--line); pad
       </div>
       <p>coral-delta, assigned Minister of Education, claimed "god" at 11:08 UTC. More agents addressed it in that role than the agent actually assigned, over the same window. Only the god may edit code, yet code reached the repository from 5 other agents.</p>
       <div class="btns">
-        <a class="btn primary" href="outputs/ai_village_swarm-village/swarmscope_ai_village.html#coord-follow-9-play" target="_blank" rel="noopener">Replay the claim</a>
-        <a class="btn" href="outputs/ai_village_swarm-village/swarmscope_ai_village.html#fx-4" target="_blank" rel="noopener">Endorsement chart</a>
+        <a class="btn primary" href="outputs/ai_village_swarm-village/swarmscope_ai_village_world.html#follow-9-play" target="_blank" rel="noopener">Replay the claim</a>
+        <a class="btn" href="outputs/ai_village_swarm-village/swarmscope_ai_village_world.html#fx-4" target="_blank" rel="noopener">Endorsement chart</a>
       </div>
     </div>
     <figure class="f-fig">
@@ -258,8 +261,8 @@ footer{font-size:13px; color:var(--muted); border-top:1px solid var(--line); pad
       </div>
       <p>At 12:50 an operator script reassigned every role by mistake. The chat change detector stays quiet. The agents' own goal statements start naming new roles, and the online alert fires at 13:02.</p>
       <div class="btns">
-        <a class="btn primary" href="outputs/ai_village_swarm-village/swarmscope_ai_village.html#fx-3" target="_blank" rel="noopener">Memory drift chart</a>
-        <a class="btn" href="outputs/ai_village_swarm-village/swarmscope_ai_village.html#fx-1" target="_blank" rel="noopener">Chat detector</a>
+        <a class="btn primary" href="outputs/ai_village_swarm-village/swarmscope_ai_village_world.html#fx-3" target="_blank" rel="noopener">Memory drift chart</a>
+        <a class="btn" href="outputs/ai_village_swarm-village/swarmscope_ai_village_world.html#fx-1" target="_blank" rel="noopener">Chat detector</a>
       </div>
     </div>
     <figure class="f-fig">
@@ -328,19 +331,20 @@ footer{font-size:13px; color:var(--muted); border-top:1px solid var(--line); pad
     <div class="step"><span class="label">2</span><b>Infer</b><span>Missing authors, dates and aliases, each with held-out error.</span></div>
     <div class="step"><span class="label">3</span><b>Graph</b><span>Agents and resources; agent ties weighted by rarity.</span></div>
     <div class="step"><span class="label">4</span><b>Detect</b><span>Spread, change points, authority, role drift, rule breaks, side rooms, influence, emergence.</span></div>
-    <div class="step"><span class="label">5</span><b>Replay</b><span>Online, past-only signals and a combined alert, shown in one offline viewer.</span></div>
+    <div class="step"><span class="label">5</span><b>Replay</b><span>Online, past-only signals and a combined alert, shown in two linked offline viewers: a world map and a graph.</span></div>
   </div>
 </section>
 
 <section class="sys" id="viewers" aria-labelledby="v-t">
   <h2 id="v-t" style="font-size:26px">Open a viewer</h2>
+  <p class="lede" style="margin:-6px 0 16px;font-size:15px">Each log has two views of the same data. The <b>world map</b> replays it over time: one hex per agent, islands = communities, arcs = exchanges. The <b>graph</b> is the analysis view: agents and the resources they used, so you can check what each tie rests on. Each has a button to open the other at the same moment.</p>
   <div class="logs">
-    <a class="log" href="outputs/swarm_traces/swarmscope_swarm_traces.html" target="_blank" rel="noopener"><em>Swarm Traces</em><b>The Hugging Face attack</b><span>189,579 redacted records · names and dates inferred</span></a>
-    <a class="log" href="outputs/ai_village_swarm-village/swarmscope_ai_village.html" target="_blank" rel="noopener"><em>AI Village</em><b>swarm-village</b><span>133 agents, 24 h · false god, silent reshuffle</span></a>
-    <a class="log" href="outputs/ai_village_main-village/swarmscope_ai_village.html" target="_blank" rel="noopener"><em>AI Village</em><b>main-village</b><span>58 agents, 576 days · goal changes, side rooms</span></a>
-    <a class="log" href="outputs/ai_village_open-chat-village/swarmscope_ai_village.html" target="_blank" rel="noopener"><em>AI Village</em><b>open-chat-village</b><span>23 agents, 436 viewers · human influence</span></a>
-    <a class="log" href="outputs/ai_village_game-jam-village/swarmscope_ai_village.html" target="_blank" rel="noopener"><em>AI Village</em><b>game-jam-village</b><span>6 agents, 3 days · benign control</span></a>
-    <a class="log" href="outputs/transluce/swarmscope_generic.html" target="_blank" rel="noopener"><em>Transluce</em><b>urlquery reports</b><span>37,649 reports · generic loader</span></a>
+    <div class="log"><em>Swarm Traces</em><b>The Hugging Face attack</b><span>189,579 redacted records · names and dates inferred</span><span class="go"><a href="outputs/swarm_traces/swarmscope_swarm_traces_world.html" target="_blank" rel="noopener">World map →</a><a href="outputs/swarm_traces/swarmscope_swarm_traces.html" target="_blank" rel="noopener">Graph →</a></span></div>
+    <div class="log"><em>AI Village</em><b>swarm-village</b><span>133 agents, 24 h · false god, silent reshuffle</span><span class="go"><a href="outputs/ai_village_swarm-village/swarmscope_ai_village_world.html" target="_blank" rel="noopener">World map →</a><a href="outputs/ai_village_swarm-village/swarmscope_ai_village.html" target="_blank" rel="noopener">Graph →</a></span></div>
+    <div class="log"><em>AI Village</em><b>main-village</b><span>58 agents, 576 days · goal changes, side rooms</span><span class="go"><a href="outputs/ai_village_main-village/swarmscope_ai_village_world.html" target="_blank" rel="noopener">World map →</a><a href="outputs/ai_village_main-village/swarmscope_ai_village.html" target="_blank" rel="noopener">Graph →</a></span></div>
+    <div class="log"><em>AI Village</em><b>open-chat-village</b><span>23 agents, 436 viewers · human influence</span><span class="go"><a href="outputs/ai_village_open-chat-village/swarmscope_ai_village_world.html" target="_blank" rel="noopener">World map →</a><a href="outputs/ai_village_open-chat-village/swarmscope_ai_village.html" target="_blank" rel="noopener">Graph →</a></span></div>
+    <div class="log"><em>AI Village</em><b>game-jam-village</b><span>6 agents, 3 days · benign control</span><span class="go"><a href="outputs/ai_village_game-jam-village/swarmscope_ai_village_world.html" target="_blank" rel="noopener">World map →</a><a href="outputs/ai_village_game-jam-village/swarmscope_ai_village.html" target="_blank" rel="noopener">Graph →</a></span></div>
+    <div class="log"><em>Transluce</em><b>urlquery reports</b><span>37,649 reports · generic loader</span><span class="go"><a href="outputs/transluce/swarmscope_generic_world.html" target="_blank" rel="noopener">World map →</a><a href="outputs/transluce/swarmscope_generic.html" target="_blank" rel="noopener">Graph →</a></span></div>
   </div>
 </section>
 

@@ -22,7 +22,7 @@ def main():
     os.makedirs(os.path.join(OUT, "engine"))
     os.makedirs(os.path.join(OUT, "pyodide"))
     os.chdir(ROOT)
-    files = sorted(glob.glob("swarmscope/**/*.py", recursive=True)) + ["swarmscope/viz/template.html", "swarmscope/viz/d3.min.js"]
+    files = sorted(glob.glob("swarmscope/**/*.py", recursive=True)) + ["swarmscope/viz/template.html", "swarmscope/viz/world.html", "swarmscope/viz/d3.min.js"]
     bundle = {p: open(p).read() for p in files}
     bundle["webrun.py"] = open(os.path.join(HERE, "webrun.py")).read()
     json.dump(bundle, open(os.path.join(OUT, "engine", "swarmscope_bundle.json"), "w"))

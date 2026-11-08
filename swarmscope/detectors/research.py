@@ -174,7 +174,8 @@ def validated_ties(log: EventLog, alpha: float = 0.05, use_inferred: bool = Fals
     E = sum(d * c for d, c in deg_count.items()) or 1
 
     def groups(ka: int, kb: int) -> List[Tuple[int, float]]:
-        return [(c, min(1.0, ka * d / E) * min(1.0, kb * d / E)) for d, c in deg_count.items()]
+        # sorted: a fixed summation order, so p-values are identical on every run
+        return [(c, min(1.0, ka * d / E) * min(1.0, kb * d / E)) for d, c in sorted(deg_count.items())]
 
     tests = []
     for (a, b), x in shared.items():
@@ -204,7 +205,8 @@ def validated_ties(log: EventLog, alpha: float = 0.05, use_inferred: bool = Fals
 def tactics(log: EventLog, use_inferred: bool = True) -> dict:
     """Per-agent ATT&CK tactic profile, roles, and group-vs-individual coverage.
 
-    * role: the tactic with most of the agent's events
+    * role: the tactic with most of the agent's events (ties go to the tactic
+      listed first in TACTIC_ORDER, so the result does not depend on set order)
     * specialisation: 1 - entropy / max entropy (1 = one tactic only, 0 = even mix)
     * patchwork: tactics covered by the group vs by the best single agent, and
       the fewest agents that together cover everything (greedy set cover)
@@ -235,7 +237,7 @@ def tactics(log: EventLog, use_inferred: bool = True) -> dict:
         tot = sum(c.values())
         k = len(TACTIC_ORDER)
         ent = -sum((v / tot) * math.log(v / tot) for v in c.values())
-        roles[a] = dict(role=c.most_common(1)[0][0],
+        roles[a] = dict(role=min(c, key=lambda t: (-c[t], TACTIC_ORDER.index(t))),
                         specialisation=round(1 - ent / math.log(k), 3),
                         tactics=sorted(c, key=lambda t: TACTIC_ORDER.index(t)))
     group_cov = {t for t in TACTIC_ORDER if tactic_agents.get(t)}

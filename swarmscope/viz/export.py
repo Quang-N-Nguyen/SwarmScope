@@ -20,7 +20,7 @@ from collections import Counter, defaultdict
 from typing import Dict, Optional
 
 from ..events import EventLog
-from ..graph import build_activity_graph, build_agent_projection
+from ..graph import TemporalGraph, _label_propagation, build_activity_graph, build_agent_projection
 
 _HERE = os.path.dirname(__file__)
 
@@ -142,6 +142,62 @@ def _cascades(findings: dict, per_kind: int = 3) -> list:
     return out
 
 
+def _exchanges(log: EventLog, attributed: bool, prefer_time: bool = True,
+               max_rows: int = 200_000) -> dict:
+    """Agent-to-agent exchanges, one row each, for the animated arcs of the world viewer.
+
+    * Named-speaker logs: ``A @-addressed B`` (one row per recipient).
+    * Redacted logs: a dead-drop hand-off. When agent B uses a resource whose
+      latest earlier user was agent A, that is a row A -> B (the same "latest
+      earlier user" rule as "Follow an item"; an order, not proof that B read
+      A's bytes).
+
+    Returns ``{"agents": [node ids], "base": t0, "rows": [[dt, pos, i, j, inf]]}``:
+    ``dt`` seconds after ``base`` (None without a date), ``pos`` the discovery
+    position, ``i``/``j`` indexes into ``agents``, ``inf`` 1 when either end
+    was named by inference. Ids and times only, never payload text.
+    """
+    from ..graph import _CHANNEL_REF_TYPES
+    ordered = log.sorted_events(prefer_time)
+    timed = [e.ts for e in ordered if e.ts is not None]
+    base = min(timed) if timed else 0
+    idx: Dict[str, int] = {}
+
+    def ix(name):
+        nid = "agent:" + name
+        if nid not in idx:
+            idx[nid] = len(idx)
+        return idx[nid]
+
+    rows = []
+    last: Dict[str, tuple] = {}
+    for pos, e in enumerate(ordered):
+        dt = None if e.ts is None else round(e.ts - base)
+        if attributed:
+            if not e.actor:
+                continue
+            for r in dict.fromkeys(e.recipients):
+                if r != e.actor:
+                    rows.append([dt, pos, ix(e.actor), ix(r), 0])
+            continue
+        who = e.who(True)
+        if not who:
+            continue
+        inf = 1 if e.actor is None else 0
+        res = ([e.channel] if e.channel else []) + [f"{rt}:{x}" for rt in _CHANNEL_REF_TYPES for x in e.ref_list(rt)]
+        done = set()
+        for r in res:
+            prev = last.get(r)
+            if prev and prev[0] != who and prev[0] not in done:
+                done.add(prev[0])
+                rows.append([dt, pos, ix(prev[0]), ix(who), max(inf, prev[1])])
+            last[r] = (who, inf)
+    if len(rows) > max_rows:
+        step = len(rows) / max_rows
+        rows = [rows[int(i * step)] for i in range(max_rows)]
+    return dict(agents=list(idx), base=base, rows=rows)
+
+
 EVENTS_PER_AGENT = 200
 _TRAIL_FLAGS = ("board_token", "mailbox", "image_exfil", "dns_exfil", "signed_cmd", "lock_dupctrl",
                 "loot", "tunnel", "k8s", "container_registry", "cleanup", "external_llm", "credential_use",
@@ -198,7 +254,9 @@ def build_graph_data(log: EventLog, findings: Optional[dict] = None,
     attributed = bool(findings.get("attributed"))
     status: Dict[str, int] = {}
     goal_now: Dict[str, str] = {}
+    priv_role = None    # the privileged role the authority detector checked (e.g. "god")
     if attributed:
+        priv_role = next(iter(sorted(findings["attributed"].get("authority") or {})), None)
         for r in (findings["attributed"].get("authority") or {}).values():
             for c in r["claimants"]:
                 status["agent:" + c["agent"]] = 2 if c["assigned"] else 1
@@ -270,6 +328,26 @@ def build_graph_data(log: EventLog, findings: Optional[dict] = None,
     else:
         proj_links = [dict(s=e["src"], t=e["dst"], p0=e["pos"], t0=e.get("ts"),
                            w=e.get("weight", 1)) for e in proj.edges]
+
+    # ---- islands for the world view: the paper's communities (label
+    # propagation, Raghavan et al. 2007) on the same agent graph the viewer
+    # draws. Redacted logs: the shared-resource projection's communities.
+    # Named logs: the @-address graph. -1 = no ties.
+    if attributed:
+        ag = TemporalGraph()
+        for l in proj_links:
+            for x in (l["s"], l["t"]):
+                if x not in ag.nodes:
+                    ag.add_node(x, "agent", x, 0, None)
+            ag.add_edge(l["s"], l["t"], "coordinate", 0, None, "a")
+            ag.edges[-1]["weight"] = l["w"]
+        groups = _label_propagation(ag)
+    else:
+        groups = comms
+    linked = {x for l in proj_links for x in (l["s"], l["t"])}
+    for nd in nodes:
+        if nd["ty"] == "agent":
+            nd["grp"] = groups.get(nd["id"], -1) if nd["id"] in linked else -1
 
     # ---- discovery-order markers (browsing only)
     ew = findings.get("early_warning", {})
@@ -355,7 +433,7 @@ def build_graph_data(log: EventLog, findings: Optional[dict] = None,
     cascades = _cascades(findings)
     s = findings.get("summary", {})
     return dict(
-        meta=dict(source=log.name, axis=act.axis, n_events=len(log), attributed=attributed,
+        meta=dict(source=log.name, village=getattr(log, "village", None), priv_role=priv_role, axis=act.axis, n_events=len(log), attributed=attributed,
                   n_agents=len(log.actors()), maxpos=maxpos, prefer_time=prefer_time,
                   named_total_frac=s.get("named_total_frac"), dated_total_frac=s.get("dated_total_frac")),
         clock=dict(tmin=tmin, tmax=tmax, window=win, n_timed=len(timed)),
@@ -368,6 +446,7 @@ def build_graph_data(log: EventLog, findings: Optional[dict] = None,
         summary=s,
         forensics=forensics,
         cascades=cascades,
+        exchanges=_exchanges(log, attributed, prefer_time),
     )
 
 
@@ -375,15 +454,16 @@ D3_CDN = "https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"
 
 
 def write_html(graph_data: dict, out_html: str, title: str = "SwarmScope",
-               mode: str = "local") -> str:
+               mode: str = "local", template: str = "template.html") -> str:
     """Write the viewer.
 
     mode="local"    -> a full standalone document with D3 inlined; opens offline
                        by double-clicking the file.
     mode="artifact" -> page body only, D3 loaded from cdnjs; for publishing as a
                        hosted page (the host adds the document skeleton).
+    template        -> "template.html" (graph viewer) or "world.html" (world map).
     """
-    with open(os.path.join(_HERE, "template.html")) as f:
+    with open(os.path.join(_HERE, template)) as f:
         tpl = f.read()
     # "<\/" keeps text from the log (e.g. "</script>") from closing the data script.
     data = json.dumps(graph_data).replace("</", "<\\/")

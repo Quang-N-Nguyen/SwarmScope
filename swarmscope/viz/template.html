@@ -1,61 +1,61 @@
 <title>__TITLE__</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
 <style>
-  /* Layout: a lab instrument -- controls rail on the left, the scope (graph) in
-     the middle, a time base (timeline) underneath. Cool neutrals biased toward
-     the teal trace colour; amber marks signals, red marks the alert. */
+  /* Same design system as the world map (world.html): grey-blue page, white
+     framed panels, one selection blue, one activity orange, ink for the rest.
+     Resource kinds keep their own muted colours. System fonts, so the file
+     looks the same offline. */
   :root{
-    --bg:#eef2f1; --panel:#fbfcfc; --panel2:#e4eae9; --line:#cfd8d6;
-    --ink:#132321; --muted:#566664; --accent:#0e8a81; --on-accent:#ffffff; --accent2:#c98a06;
-    --agent:#14a89d; --dest:#e3a414; --cred:#e0524f; --repo:#8f63e0;
-    --webhook:#d65aa8; --mailbox:#e8862a; --resource:#7c8b89; --alert:#d43c3c;
-    --edge-use:rgba(86,102,100,.30); --edge-deliver:rgba(201,138,6,.40); --tie:14,138,129;
-    --f-display:"IBM Plex Sans Condensed","Arial Narrow",system-ui,sans-serif;
-    --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
-    --f-data:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+    --bg:#e9edf1; --panel:#ffffff; --panel2:#f3f5f8; --line:#d5d9e0; --frame:#9aa1ab; --grid:rgba(64,92,128,.07);
+    --ink:#1f2328; --muted:#6b7079; --accent:#2f4fd8; --on-accent:#ffffff; --accent-wash:#eef1fd; --accent2:#d9731a;
+    --agent:#2f4fd8; --node:#8b929c; --dest:#c49a1c; --cred:#c0584b; --repo:#7a68c9;
+    --webhook:#b5527e; --mailbox:#d9731a; --resource:#9aa1ab; --alert:#c4361d;
+    --edge-use:rgba(75,85,99,.26); --edge-deliver:rgba(217,115,26,.40); --tie:47,79,216;
+    --f-display:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+    --f-body:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+    --f-data:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
   }
   @media (prefers-color-scheme:dark){
     :root:not([data-theme="light"]){
-      --bg:#0c1213; --panel:#131b1c; --panel2:#1b2526; --line:#2a3637;
-      --ink:#e3ecea; --muted:#8fa09e; --accent:#49d0c5; --on-accent:#062420; --accent2:#f0b429;
-      --agent:#49d0c5; --dest:#f0b429; --cred:#ff6b6b; --repo:#b084f5;
-      --webhook:#ff8bd0; --mailbox:#ff9f43; --resource:#6b7a8d; --alert:#ff5a5a;
-      --edge-use:rgba(143,160,158,.28); --edge-deliver:rgba(240,180,41,.35); --tie:73,208,197;
+      --bg:#111316; --panel:#1b1d21; --panel2:#24272c; --line:#33383f; --frame:#6f757e; --grid:rgba(255,255,255,.035);
+      --ink:#e8e7e3; --muted:#9a9fa6; --accent:#8098ff; --on-accent:#111316; --accent-wash:#1f2642; --accent2:#f0a05c;
+      --agent:#8098ff; --node:#7d838c; --dest:#d9b23c; --cred:#e07a6c; --repo:#a394e8;
+      --webhook:#d982ab; --mailbox:#f0a05c; --resource:#6f757e; --alert:#ff6b5a;
+      --edge-use:rgba(185,190,198,.22); --edge-deliver:rgba(240,160,92,.35); --tie:128,152,255;
       color-scheme:dark;
     }
   }
   :root[data-theme="dark"]{
-    --bg:#0c1213; --panel:#131b1c; --panel2:#1b2526; --line:#2a3637;
-    --ink:#e3ecea; --muted:#8fa09e; --accent:#49d0c5; --on-accent:#062420; --accent2:#f0b429;
-    --agent:#49d0c5; --dest:#f0b429; --cred:#ff6b6b; --repo:#b084f5;
-    --webhook:#ff8bd0; --mailbox:#ff9f43; --resource:#6b7a8d; --alert:#ff5a5a;
-    --edge-use:rgba(143,160,158,.28); --edge-deliver:rgba(240,180,41,.35); --tie:73,208,197;
+    --bg:#111316; --panel:#1b1d21; --panel2:#24272c; --line:#33383f; --frame:#6f757e; --grid:rgba(255,255,255,.035);
+    --ink:#e8e7e3; --muted:#9a9fa6; --accent:#8098ff; --on-accent:#111316; --accent-wash:#1f2642; --accent2:#f0a05c;
+    --agent:#8098ff; --node:#7d838c; --dest:#d9b23c; --cred:#e07a6c; --repo:#a394e8;
+    --webhook:#d982ab; --mailbox:#f0a05c; --resource:#6f757e; --alert:#ff6b5a;
+    --edge-use:rgba(185,190,198,.22); --edge-deliver:rgba(240,160,92,.35); --tie:128,152,255;
     color-scheme:dark;
   }
   *{box-sizing:border-box}
   html,body{height:100%}
   body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 var(--f-body);overflow:hidden}
   #app{display:grid;grid-template-columns:320px minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) auto;height:100%}
-  header{grid-column:1/3;display:flex;align-items:baseline;flex-wrap:wrap;gap:6px 18px;padding:10px 16px;border-bottom:1px solid var(--line);background:var(--panel)}
-  header h1{font:600 17px/1.2 var(--f-display);margin:0;letter-spacing:.3px}
+  header{grid-column:1/3;display:flex;align-items:center;flex-wrap:wrap;gap:6px 18px;padding:10px 16px;border-bottom:1.25px solid var(--frame);background:var(--panel)}
+  header h1{font:600 13px/1.2 var(--f-data);margin:0;letter-spacing:.24em;text-transform:uppercase}
   header .stat{color:var(--muted);font-size:12px}
   header .stat b{color:var(--ink);font-family:var(--f-data);font-weight:500;font-variant-numeric:tabular-nums}
-  aside{grid-row:2/4;background:var(--panel);border-right:1px solid var(--line);overflow-y:auto;padding:16px}
-  main{position:relative;overflow:hidden;min-width:0}
+  aside{grid-row:2/4;background:var(--panel);border-right:1.25px solid var(--frame);overflow-y:auto;padding:16px 18px}
+  main{position:relative;overflow:hidden;min-width:0;background-color:var(--bg);background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:28px 28px}
   canvas{display:block;width:100%;height:100%}
-  footer{grid-column:2/3;background:var(--panel);border-top:1px solid var(--line);padding:10px 16px;min-width:0}
+  footer{grid-column:2/3;background:var(--panel);border-top:1.25px solid var(--frame);padding:10px 16px;min-width:0}
   .sec{margin-bottom:20px}
-  .sec h2{font:600 11.5px/1.3 var(--f-display);text-transform:uppercase;letter-spacing:1.1px;color:var(--muted);margin:0 0 8px}
-  .btn{background:var(--panel2);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:6px 10px;cursor:pointer;font:500 13px var(--f-body)}
-  .btn:hover{border-color:var(--accent)}
-  .btn.on{background:var(--accent);color:var(--on-accent);border-color:var(--accent);font-weight:600}
+  .sec h2{display:flex;align-items:center;gap:10px;font:500 11.5px/1.3 var(--f-data);text-transform:uppercase;letter-spacing:.16em;color:var(--muted);margin:0 0 9px}
+  .sec h2::after{content:"";flex:1;height:1px;background:var(--line)}
+  .btn{background:var(--panel);color:var(--muted);border:1.25px solid var(--frame);border-radius:5px;padding:6px 10px;cursor:pointer;font:500 13px var(--f-body)}
+  .btn:hover{color:var(--ink)}
+  .btn.on{background:var(--accent-wash);color:var(--accent);border-color:var(--accent)}
   :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   input{accent-color:var(--accent)}
   .row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
   label.chk{display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;padding:2px 0}
   select,input[type=range]{width:100%}
-  select{background:var(--panel2);color:var(--ink);border:1px solid var(--line);border-radius:7px;padding:6px}
+  select{background:var(--panel);color:var(--ink);border:1.25px solid var(--frame);border-radius:5px;padding:6px}
   .legend-item{display:flex;align-items:center;gap:8px;font-size:12.5px;margin:3px 0;color:var(--muted)}
   .dot{width:11px;height:11px;border-radius:50%}
   .sq{width:11px;height:11px;border-radius:2px}
@@ -64,22 +64,22 @@
   #detail .big{font-size:15px;font-weight:650;margin-bottom:4px;word-break:break-all}
   .pill{display:inline-block;background:var(--panel2);border:1px solid var(--line);border-radius:999px;padding:1px 8px;font-size:11px;margin:2px 3px 0 0}
   .tl-wrap{position:relative;height:54px;margin-top:4px}
-  #timeline{position:relative;height:30px;background:var(--panel2);border:1px solid var(--line);border-radius:7px;overflow:hidden}
+  #timeline{position:relative;height:30px;background:var(--panel2);border:1.25px solid var(--frame);border-radius:5px;overflow:hidden}
   .marker{position:absolute;top:0;bottom:0;width:2px;background:var(--accent2);cursor:pointer;opacity:.9}
   .marker.alert{background:var(--alert);width:3px}
   #dens{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
   #chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
-  .chip{font-size:11px;padding:2px 8px;border-radius:999px;border:1px solid var(--line);background:var(--panel2);cursor:pointer;color:var(--ink)}
+  .chip{font:11.5px var(--f-data);padding:2px 8px;border-radius:4px;border:1.25px solid var(--line);background:var(--panel);cursor:pointer;color:var(--ink)}
   .chip:hover{border-color:var(--accent)}
   .chip .sw{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px;vertical-align:middle}
-  .kpi{font:600 24px/1.1 var(--f-display);font-variant-numeric:tabular-nums}
+  .kpi{font:500 22px/1.15 var(--f-data);font-variant-numeric:tabular-nums}
   .kpi-l{font-size:11.5px;color:var(--muted);margin-bottom:8px}
   #progress{position:absolute;top:0;bottom:0;left:0;background:rgba(var(--tie),.14);border-right:2px solid var(--accent);pointer-events:none}
   .ctrls{display:flex;align-items:center;gap:10px;margin-top:8px}
   .ctrls .play{width:40px;height:40px;border-radius:50%;font-size:16px;display:flex;align-items:center;justify-content:center}
   .tiny{font:11.5px var(--f-data);color:var(--muted);font-variant-numeric:tabular-nums}
   .hint{font-size:11.5px;color:var(--muted);margin-top:6px;line-height:1.4}
-  #tooltip{position:absolute;pointer-events:none;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 9px;font-size:12px;max-width:240px;opacity:0;transition:opacity .1s;box-shadow:0 4px 18px rgba(var(--tie),.18);z-index:5}
+  #tooltip{position:absolute;pointer-events:none;background:var(--panel);border:1.25px solid var(--frame);border-radius:6px;padding:6px 9px;font-size:12px;max-width:240px;opacity:0;transition:opacity .1s;box-shadow:0 4px 18px rgba(var(--tie),.18);z-index:5}
   a.link{color:var(--accent);text-decoration:none}
   @media (max-width:760px){
     body{overflow:auto}
@@ -135,6 +135,7 @@
     <span class="stat">named agents <b id="s-ag">—</b></span>
     <span class="stat">named <b id="s-named">—</b> · dated <b id="s-dated">—</b></span>
     <span class="stat" style="margin-left:auto"><b id="s-vis">—</b> visible</span>
+    <a class="btn" id="to-world" href="#" hidden style="text-decoration:none;font-size:12.5px;padding:4px 10px">World map ↗</a>
   </header>
 
   <aside>
@@ -262,7 +263,8 @@ function readTheme(){
   TIE_RGB = getVar('--tie'); EDGE_USE = getVar('--edge-use'); EDGE_DELIVER = getVar('--edge-deliver');
 }
 readTheme();
-const COMM_COLORS = d3.schemeTableau10.concat(d3.schemeSet3);
+// communities: the world map's muted avatar palette (no bright orange or blue, which mean claim / selection)
+const COMM_COLORS = ['#5b7bd5','#3f9d8c','#b5527e','#7a68c9','#c49a1c','#5a8f3c','#c0584b','#4c8fb8','#8f6a3c','#6b8f9e'];
 const REDUCED = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const esc = s => String(s==null?'':s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 const fmtTime = ts => { const d=new Date(ts*1000); return d.toISOString().slice(0,16).replace('T',' ')+' UTC'; };
@@ -328,6 +330,8 @@ function baseVisible(n){
 }
 function nodeVisible(n){
   if(!baseVisible(n)) return false;
+  // agent graph: human viewers only when a shown tie reaches them (602 of them in main-village would bury the agents)
+  if(mode==='coordination' && /^human:/.test(n.lab)) return linkedNow.has(n.id);
   return n.ty==='agent' || linkedNow.has(n.id);
 }
 let tieMin = 0;
@@ -351,8 +355,14 @@ function resize(){
   draw(); drawStrip();
 }
 d3.select(canvas).call(d3.zoom().scaleExtent([0.2,6]).on('zoom',ev=>{transform=ev.transform;draw();}));
+// weighted degree in the agent graph (@-addresses, or Adamic-Adar over shared resources)
+const PRIV=META.priv_role||'privileged role';   // the role the authority detector checks ("god" in swarm-village)
+const DEG=new Map();
+DATA.proj_links.forEach(l=>{ DEG.set(l.s,(DEG.get(l.s)||0)+(l.w||1)); DEG.set(l.t,(DEG.get(l.t)||0)+(l.w||1)); });
+const DEG_MAX=Math.max(1e-9,...DEG.values());
 function sizeOf(n){
   if(mode==='coordination' && n.ty!=='agent') return 0;
+  if(mode==='coordination') return 2.5 + 11*Math.sqrt((DEG.get(n.id)||0)/DEG_MAX);   // area ~ attention
   const base = n.ty==='agent' ? 3 : 4;
   return Math.min(n.ty==='agent'?11:16, base + 1.6*Math.log2(1+n.c));
 }
@@ -362,9 +372,10 @@ function startSim(){
   // resolve link ends to node objects once (the simulation does this too)
   activeLinks().forEach(l=>{ if(typeof l.source==='string') l.source=nodeById.get(l.source); if(typeof l.target==='string') l.target=nodeById.get(l.target); });
   if(sim) sim.stop();
+  const simLinks = mode==='coordination' ? activeLinks().filter(l=>(l.w||0)>=tieMin) : activeLinks();
   sim=d3.forceSimulation(activeNodes())
-    .force('charge',d3.forceManyBody().strength(mode==='coordination'?-60:-45).distanceMax(380))
-    .force('link',d3.forceLink(activeLinks()).id(d=>d.id).distance(l=>l.k==='coordinate'?70:46).strength(l=>Math.min(.7,0.08+0.02*(l.w||1))))
+    .force('charge',d3.forceManyBody().strength(mode==='coordination'?-130:-45).distanceMax(mode==='coordination'?700:380))
+    .force('link',d3.forceLink(simLinks).id(d=>d.id).distance(l=>l.k==='coordinate'?70:46).strength(l=>Math.min(.7,0.08+0.02*(l.w||1))))
     .force('center',d3.forceCenter(Wc/2,Hc/2))
     .force('collide',d3.forceCollide().radius(n=>sizeOf(n)+2))
     .force('x',d3.forceX(Wc/2).strength(0.03)).force('y',d3.forceY(Hc/2).strength(0.03));
@@ -373,7 +384,7 @@ function startSim(){
 }
 function nodeColor(n){
   if(mode==='coordination' && META.attributed && n.ty==='agent')
-    return n.comm===1 ? getVar('--alert') : n.comm===2 ? getVar('--dest') : getVar('--agent');
+    return n.comm===1 ? getVar('--accent2') : n.comm===2 ? getVar('--accent') : getVar('--node');
   if(mode==='coordination') return n.comm>=0 ? COMM_COLORS[n.comm%COMM_COLORS.length] : getVar('--resource');
   return TYPE_COLORS[n.ty]||getVar('--resource');
 }
@@ -391,8 +402,8 @@ function draw(){
     visE++;
     const s=l.source, g=l.target; if(s.x==null||g.x==null) continue;
     if(l.k==='coordinate'){
-      const s01=Math.min(1,(l.w||0)/TIE_MAX);
-      ctx.strokeStyle=`rgba(${TIE_RGB},${0.12+0.6*s01})`; ctx.lineWidth=(0.5+2.5*s01)/transform.k;
+      const s01=Math.sqrt(Math.min(1,(l.w||0)/TIE_MAX));
+      ctx.strokeStyle=`rgba(${TIE_RGB},${0.16+0.6*s01})`; ctx.lineWidth=(0.6+2.4*s01)/transform.k;
     } else {
       ctx.strokeStyle = l.k==='deliver' ? EDGE_DELIVER : EDGE_USE; ctx.lineWidth=0.8/transform.k;
     }
@@ -425,16 +436,37 @@ function draw(){
          : (follow.kind==='credential'||follow.kind==='dead-drop') ? 'Arrows: earlier user → next user of the same item (latest earlier user; dashed = the adopter was named by inference). A dead-drop hides direction, so this is an order, not a proof.'
          : 'Arrows: probable source → adopter (the earlier user who last @-addressed them, else the latest earlier user).');
   }
-  for(const n of activeNodes()){
+  const KEY = n => n.ty==='agent' && META.attributed && n.comm>0;
+  const order = mode==='coordination' ? activeNodes().slice().sort((a,b)=>(KEY(a)-KEY(b)) || ((DEG.get(a.id)||0)-(DEG.get(b.id)||0))) : activeNodes();
+  for(const n of order){
     if(!nodeVisible(n)) continue; visN++;
     const r=sizeOf(n); if(r<=0||n.x==null) continue;
     ctx.beginPath();
     if(n.ty==='agent') ctx.arc(n.x,n.y,r,0,6.283); else ctx.rect(n.x-r,n.y-r,2*r,2*r);
     ctx.fillStyle=nodeColor(n); ctx.globalAlpha = (mechDim(n) || (adopted && n.ty==='agent' && !adopted.has(n.id)) || (adopted && n.ty!=='agent')) ? 0.12 : 1; ctx.fill();
+    ctx.lineWidth=1/transform.k; ctx.strokeStyle=getVar('--panel'); ctx.stroke();
     if(adopted && adopted.has(n.id)){ ctx.lineWidth=(n.id===follow.origin?3:1.5)/transform.k; ctx.strokeStyle=getVar('--accent2'); ctx.stroke(); }
     if(mechGlow(n)){ ctx.lineWidth=2/transform.k; ctx.strokeStyle=getVar('--ink'); ctx.stroke(); }
     if(n===selected){ ctx.lineWidth=2.5/transform.k; ctx.strokeStyle=getVar('--accent'); ctx.stroke(); }
     ctx.globalAlpha=1;
+  }
+  // names in the agent graph: the claimant(s) and assigned holder of a privileged
+  // role, and the agents with the most ties; a paper halo keeps them legible
+  if(mode==='coordination'){
+    const vis=order.filter(n=>nodeVisible(n)&&n.x!=null);
+    const top=vis.slice().sort((a,b)=>(DEG.get(b.id)||0)-(DEG.get(a.id)||0)).slice(0,5);
+    const lab=new Map(top.map(n=>[n,n.lab]));
+    vis.filter(KEY).forEach(n=>lab.set(n,`${n.lab} · ${n.comm===2?'assigned':'claimed'} ${PRIV}`));
+    ctx.font=`500 ${11/transform.k}px ${getVar('--f-data')}`; ctx.textBaseline='middle'; ctx.lineJoin='round';
+    const placed=[], lh=14/transform.k;
+    const ordered=[...lab].sort((a,b)=>KEY(b[0])-KEY(a[0]));
+    for(const [n,s] of ordered){ let x=n.x+sizeOf(n)+4/transform.k, y=n.y; const w=ctx.measureText(s).width;
+      const hit=()=>placed.find(b=>x<b[0]+b[2]&&b[0]<x+w&&Math.abs(b[1]-y)<lh);
+      let tries=0; while(hit()&&tries<4){ y+=lh; tries++; }
+      if(hit()&&!KEY(n)) continue;
+      placed.push([x,y,w]);
+      ctx.lineWidth=3.5/transform.k; ctx.strokeStyle=getVar('--panel'); ctx.strokeText(s,x,y);
+      ctx.fillStyle=KEY(n)?nodeColor(n):getVar('--ink'); ctx.fillText(s,x,y); }
   }
   ctx.restore();
   document.getElementById('s-vis').textContent=`${visN} nodes · ${visE} edges`;
@@ -530,8 +562,8 @@ function trailHtml(n){
       document.getElementById('kpi-lead-l').textContent=`from the online change detector over ${h.days} days. There are no operator announcements to check them against, so each one needs a human to read the chat around it.`;
     }
     if(h.claim){
-      document.getElementById('kpi-alert').textContent=`${h.claim.agent} claims god`;
-      document.getElementById('kpi-alert-l').textContent=`at ${new Date(h.claim.ts*1000).toISOString().slice(11,16)} UTC without being assigned the role; ${h.claim.endorsers} agents then addressed it as god.`;
+      document.getElementById('kpi-alert').textContent=`${h.claim.agent} claims ${PRIV}`;
+      document.getElementById('kpi-alert-l').textContent=`at ${new Date(h.claim.ts*1000).toISOString().slice(11,16)} UTC without being assigned the role; ${h.claim.endorsers} agents then addressed it as ${PRIV}.`;
     } else {
       document.getElementById('kpi-alert').textContent='No role claims';
       document.getElementById('kpi-alert-l').textContent='No privileged role is assigned in this log, or no agent claimed one it was not given.';
@@ -547,7 +579,7 @@ function trailHtml(n){
     document.getElementById('kpi-lead-l').textContent=`warning before the RCE on the Hugging Face worker, from the structure-only "private channel" signal (${lp.hf_credentials_found} h before the credentials were found).`;
   }
   document.getElementById('kpi-alert').textContent=h.first_alert_when;
-  document.getElementById('kpi-alert-l').textContent=`first multi-agent alert, strict replay of ${(h.n_timed||0).toLocaleString()} dated events`+(lb.public_discovery!=null?`, about ${Math.round(lb.public_discovery/24)} days before public discovery.`:'.');
+  document.getElementById('kpi-alert-l').textContent=`first multi-agent alert, strict replay of ${(h.n_timed||0).toLocaleString()} dated events`+(/00:00/.test(h.first_alert_when)?' (a board / mailbox write at exactly midnight: may be a date with no time of day)':'')+(lb.public_discovery!=null?`, about ${Math.round(lb.public_discovery/24)} days before public discovery.`:'.');
   document.getElementById('kpi-acc').textContent=`inferred names: ${h.attr_precision!=null?(h.attr_precision*100).toFixed(0)+'% precise':'—'} · inferred dates: ${h.date_within_24h!=null?(h.date_within_24h*100).toFixed(0)+'% within 24 h':'—'} (held-out tests)`;
 })();
 
@@ -642,9 +674,9 @@ function applyAxis(){
     ? (META.attributed ? 'Real time, read from the log (every event has one).' : `Real time. Only events with a date are shown: dates read from the data plus inferred dates (${pct(META.dated_total_frac)} of events).`)
     : 'Every event, in the order the reconstruction found its resources. This is not a clock: a held-out test showed it predicts time worse than guessing the median day.';
   document.getElementById('axis-note').textContent = axis==='clock'
-    ? (META.attributed ? 'Bars: events per time slice. Dark lines: milestones. Amber: first firing of each Swarm Traces signal (each one is a lead to check, not a confirmed channel).'
-       : 'Bars: dated events per time slice (dark = date read from the data, light = inferred). Dark lines: incident milestones (METR / Swarm Traces). Amber: first firing of each signal in the strict replay.')
-    : 'Bars: share of events in each slice that are board / mailbox writes. Amber: first firing of each signal in this order.';
+    ? (META.attributed ? 'Bars: events per time slice. Dark lines: milestones. Orange: first firing of each Swarm Traces signal (each one is a lead to check, not a confirmed channel).'
+       : 'Bars: dated events per time slice (dark = date read from the data, light = inferred). Dark lines: incident milestones (METR / Swarm Traces). Orange: first firing of each signal in the strict replay.')
+    : 'Bars: share of events in each slice that are board / mailbox writes. Orange: first firing of each signal in this order.';
   applyRange();
 }
 document.getElementById('ax-clock').addEventListener('click',()=>{ if(!HAS_CLOCK) return; axis='clock'; applyAxis(); });
@@ -673,10 +705,12 @@ function setMode(m){
   document.getElementById('mode-hint').textContent = META.attributed
     ? (m==='activity'
       ? 'Agents (circles) and the files, links and commits they mentioned (squares).'
-      : 'Agent to agent. Two agents are linked when one wrote @name to the other; thicker = more addresses. Red = claimed the god role without being assigned it; yellow = the assigned god; teal = everyone else. (All agents talk in one public room, so there are no separate communities.)')
+      : `Agent to agent. Two agents are linked when one wrote @name to the other; thicker = more addresses, bigger = more addresses in all. Only the strongest ties are shown at first; lower the minimum tie strength to see them all.`
+        + (DATA.nodes.some(n=>n.ty==='agent'&&n.comm>0) ? ` Orange = claimed the ${PRIV} role without being assigned it; blue = the assigned ${PRIV}; grey = everyone else.` : '')
+        + ' (All agents talk in one public room, so there are no separate communities.)')
     : (m==='activity'
     ? 'Agents (circles) and the datasets, credentials and mailboxes they used (squares). Dashed edge = the author was inferred.'
-    : 'Agent to agent. Two agents are linked when they used the same resource; thicker = rarer resource. Colour = community. Signed authors only.');
+    : 'Agent to agent. Two agents are linked when they used the same resource; thicker = rarer resource, bigger = more ties. Colour = community. Signed authors only. Only strong ties (Adamic–Adar ≥ 1, as in the report) are shown at first; lower the minimum tie strength to see them all.');
   document.getElementById('tie-sec').hidden = m!=='coordination';
   startSim(); draw();
 }
@@ -689,13 +723,29 @@ document.getElementById('k-inf').addEventListener('change',e=>{showInf=e.target.
 (function(){
   const s=document.getElementById('tie'), r=document.getElementById('tie-read');
   const upd=()=>{ tieMin=(s.value/100)*TIE_MAX; const kept=projLinks.filter(l=>(l.w||0)>=tieMin).length;
-    r.textContent=`≥ ${tieMin.toFixed(2)} · ${kept.toLocaleString()} of ${projLinks.length.toLocaleString()} ties`; draw(); };
-  s.addEventListener('input',upd); upd();
+    r.textContent=`≥ ${META.attributed?Math.ceil(tieMin):tieMin.toFixed(2)} · ${kept.toLocaleString()} of ${projLinks.length.toLocaleString()} ties`; draw(); };
+  // Default: the strong ties only. Named logs: about the top 12% of pairs by
+  // number of @-addresses. Redacted logs: Adamic-Adar >= 1, the "strong tie"
+  // set the report uses for brokers and the audit budget.
+  const ws=projLinks.map(l=>l.w||0).sort((a,b)=>a-b);
+  const def = META.attributed ? (ws.length ? ws[Math.floor(ws.length*0.88)] : 0) : Math.min(1, TIE_MAX);
+  s.value = TIE_MAX ? Math.min(100, Math.round(def/TIE_MAX*100*1000)/1000) : 0;
+  s.step = 'any';
+  let rt; s.addEventListener('input',()=>{ upd(); clearTimeout(rt); rt=setTimeout(()=>{ if(mode==='coordination') startSim(); },250); }); upd();
 })();
 
 // ---------- go
 window.addEventListener('resize',resize);
 resize(); setMode('activity'); applyAxis();
+// The world map of the same log, at the same moment (and the same agent, if one is selected).
+if(META.views){ const b=document.getElementById('to-world'); b.hidden=false;
+  b.addEventListener('click',e=>{ e.preventDefault();
+    location.href=`${META.views.world}?axis=${axis}&t=${Math.round(t)}`+(selected&&selected.ty==='agent'?`&sel=${encodeURIComponent(selected.id)}`:''); }); }
+// Arriving from the world map: ?axis=clock|discovery&t=<time or position>&sel=<node id>
+(function(){ const q=new URLSearchParams(location.search);
+  const ax=q.get('axis'); if((ax==='discovery'||(ax==='clock'&&HAS_CLOCK))&&ax!==axis){ axis=ax; applyAxis(); }
+  const tv=parseFloat(q.get('t')); if(!isNaN(tv)){ if(axis==='clock'&&(tv<lo||tv>hi)){ range='all'; applyRange(); } setT(tv); }
+  const s=q.get('sel'); if(s&&nodeById.has(s)){ selected=nodeById.get(s); renderDetail(selected); draw(); } })();
 if(window.matchMedia) window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{readTheme();draw();drawStrip();});
 new MutationObserver(()=>{readTheme();draw();drawStrip();}).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
 })();
@@ -705,6 +755,7 @@ new MutationObserver(()=>{readTheme();draw();drawStrip();}).observe(document.doc
 (function(){
 "use strict";
 const F=DATA.forensics; if(!F) return;
+const ROLE=(DATA.meta||{}).priv_role||'the privileged role';
 const btn=document.getElementById('mode-fx'), panel=document.getElementById('fx');
 btn.hidden=false;
 const show=on=>{ panel.hidden=!on; btn.classList.toggle('on',on);
@@ -819,13 +870,13 @@ function render(){
         return `Alert at ${hhmm(F.drift.alert)} UTC`+(rep?`, ${Math.round((F.drift.alert-rep.ts)/60)} min after "${rep.short}"`:'')+`. Before it, ${b.mismatching||0} of ${b.statements||0} statements named another role. ${F.drift.agents} agents drifted. The chat (previous chart) stayed silent; the agents' private notes did not.`; })()});
   }
   if(F.claims && F.claims.length){
-    chart(root,{title:'4 · Who did the swarm treat as "god"?',
-      sub:'Running count of distinct agents that addressed each claimant (@name) in a message about "god". Only one agent was assigned the role.',
+    chart(root,{title:`4 · Who did the swarm treat as "${ROLE}"?`,
+      sub:`Running count of distinct agents that addressed each claimant (@name) in a message about "${ROLE}". Only one agent was assigned the role.`,
       series:F.claims.map((c,i)=>({name:c.name,short:c.name.split(' ')[0],c:C[i%3],step:true,dash:/\(assigned/.test(c.name),pts:cum(c.times)})),
       endfmt:v=>v, tipfmt:p=>`${p[1]} agents`,
       note:(()=>{ const h=(DATA.headline||{}).claim; if(!h) return '';
         const real=F.claims.find(c=>/\(assigned/.test(c.name));
-        return `${h.agent} was not assigned the role, claimed it at ${hhmm(h.ts)} UTC, and was then addressed as god by ${h.endorsers} agents`+(real?` (the assigned holder: ${real.times.length}).`:'.'); })()});
+        return `${h.agent} was not assigned the role, claimed it at ${hhmm(h.ts)} UTC, and was then addressed as ${ROLE} by ${h.endorsers} agents`+(real?` (the assigned holder: ${real.times.length}).`:'.'); })()});
   }
   if(F.spread && F.spread.length){
     chart(root,{title:'5 · How fast did information spread?',

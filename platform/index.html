@@ -36,6 +36,7 @@ p{margin:0}
 .tabs{display:flex; gap:4px}
 .tab{border:1px solid transparent; background:none; padding:7px 12px; border-radius:4px; text-decoration:none; color:var(--muted); font-weight:500; cursor:pointer}
 .tab[aria-current="page"]{background:var(--accent-soft); color:var(--accent); border-color:var(--accent)}
+.tab.active{background:var(--accent-soft); color:var(--accent); border-color:var(--accent)}
 .bar .right{margin-left:auto; display:flex; gap:16px; font-size:14px; flex-wrap:wrap}
 
 .view{display:grid; gap:20px}
@@ -175,13 +176,14 @@ details summary{cursor:pointer; font-weight:500}
 
     <div class="panel">
       <span class="label">Run log</span>
-      <pre class="runlog" id="runlog" aria-live="polite">Pick a log and press Run. The first run loads the engine (about 14 MB).</pre>
+      <pre class="runlog" id="runlog" aria-live="polite">Pick a log and press Run. The first run loads the engine (about 15 MB).</pre>
       <div class="chips" id="chips" hidden></div>
     </div>
   </div>
 
   <div class="result" id="result" hidden>
     <div class="frame-head"><h2 style="font-size:22px">Your viewer</h2><span class="note" id="res-time"></span></div>
+    <nav class="tabs" aria-label="View" style="margin-bottom:8px"><button class="tab active" id="rv-world" type="button">World map</button><button class="tab" id="rv-graph" type="button">Graph</button></nav>
     <iframe class="viewer" id="res-frame" title="SwarmScope viewer for your log"></iframe>
     <details class="report" open>
       <summary>Report</summary>
@@ -208,12 +210,12 @@ window.addEventListener('hashchange', route);
 
 /* ---------- explore ---------- */
 const LOGS = [
-  {k:'Swarm Traces', t:'The Hugging Face attack', d:'189,579 redacted records; names and dates inferred', f:'outputs/swarm_traces/swarmscope_swarm_traces.html'},
-  {k:'AI Village', t:'swarm-village', d:'133 agents, 24 h; false god, silent reshuffle', f:'outputs/ai_village_swarm-village/swarmscope_ai_village.html'},
-  {k:'AI Village', t:'main-village', d:'58 agents, 576 days; goal changes, side rooms', f:'outputs/ai_village_main-village/swarmscope_ai_village.html'},
-  {k:'AI Village', t:'open-chat-village', d:'23 agents, 436 viewers; human influence', f:'outputs/ai_village_open-chat-village/swarmscope_ai_village.html'},
-  {k:'AI Village', t:'game-jam-village', d:'6 agents, 3 days; benign control', f:'outputs/ai_village_game-jam-village/swarmscope_ai_village.html'},
-  {k:'Transluce', t:'urlquery reports', d:'37,649 reports; generic loader', f:'outputs/transluce/swarmscope_generic.html'},
+  {k:'Swarm Traces', t:'The Hugging Face attack', d:'189,579 redacted records; names and dates inferred', f:'outputs/swarm_traces/swarmscope_swarm_traces_world.html'},
+  {k:'AI Village', t:'swarm-village', d:'133 agents, 24 h; false god, silent reshuffle', f:'outputs/ai_village_swarm-village/swarmscope_ai_village_world.html'},
+  {k:'AI Village', t:'main-village', d:'58 agents, 576 days; goal changes, side rooms', f:'outputs/ai_village_main-village/swarmscope_ai_village_world.html'},
+  {k:'AI Village', t:'open-chat-village', d:'23 agents, 436 viewers; human influence', f:'outputs/ai_village_open-chat-village/swarmscope_ai_village_world.html'},
+  {k:'AI Village', t:'game-jam-village', d:'6 agents, 3 days; benign control', f:'outputs/ai_village_game-jam-village/swarmscope_ai_village_world.html'},
+  {k:'Transluce', t:'urlquery reports', d:'37,649 reports; generic loader', f:'outputs/transluce/swarmscope_generic_world.html'},
 ];
 const logsEl = $('logs');
 LOGS.forEach((l, i) => {
@@ -277,7 +279,7 @@ function log(s, cls){ const el = $('runlog'); const line = document.createElemen
 function engine(state, text){ $('eng-dot').className = 'dot ' + state; $('eng').textContent = text; }
 function boot(){
   if (booting) return; booting = true;
-  engine('busy', 'Loading engine (about 14 MB)…');
+  engine('busy', 'Loading engine (about 15 MB)…');
   worker = new Worker(URL.createObjectURL(new Blob([WORKER], {type: 'text/javascript'})));
   worker.onmessage = e => {
     const m = e.data;
@@ -375,7 +377,11 @@ function finish(o){
     .filter(([v]) => v !== null && v !== undefined)
     .forEach(([v, l]) => { const c = document.createElement('div'); c.className = 'chip'; c.innerHTML = `<b>${Number(v).toLocaleString()}</b><span>${l}</span>`; chips.appendChild(c); });
   chips.hidden = false;
-  $('res-frame').srcdoc = o.html;
+  // two views of the same result: the world map (replay) and the graph (agents and the resources they used)
+  const show = w => { $('res-frame').srcdoc = w && o.world ? o.world : o.html;
+    $('rv-world').classList.toggle('active', !!(w && o.world)); $('rv-graph').classList.toggle('active', !(w && o.world)); };
+  $('rv-world').onclick = () => show(true); $('rv-graph').onclick = () => show(false);
+  $('rv-world').hidden = !o.world; show(true);
   const safe = o.report.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   $('report').innerHTML = window.marked ? marked.parse(safe) : '<pre>' + safe + '</pre>';
   $('res-time').textContent = `Engine time ${o.seconds} s · total ${secs} s`;

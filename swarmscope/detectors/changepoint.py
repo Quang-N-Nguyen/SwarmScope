@@ -186,7 +186,7 @@ def corroborate(log: EventLog, alerts: List[dict], after: int = 30, before: int 
         pre = Counter(k for ts, k in acts if t - before * 60 <= ts < t)
         post = Counter(k for ts, k in acts if t <= ts < t + after * 60)
         found = []
-        for k in set(pre) | set(post):
+        for k in sorted(set(pre) | set(post)):
             r_pre = pre.get(k, 0) / before
             r_post = post.get(k, 0) / after
             if pre.get(k, 0) + post.get(k, 0) < min_events:
