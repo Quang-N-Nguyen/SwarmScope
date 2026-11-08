@@ -1,4 +1,4 @@
-# SwarmScope: Reconstructing Who Talked to Whom in Multi-Agent Logs, as a Dynamic Graph for Forensics and Early Warning
+# SwarmScope: A Dynamic-Graph Tool for Detecting Coordination and Misbehavior in Multi-Agent Logs
 
 **Apart Research Swarm Alignment Hackathon, Track 4: Multi-Agent Oversight and Control.**
 Code: https://github.com/Quang-N-Nguyen/SwarmScope
