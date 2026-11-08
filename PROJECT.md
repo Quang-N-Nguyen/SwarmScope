@@ -60,10 +60,10 @@ Better tools for these problems are among the open questions of cooperative AI [
 
 ![Figure 2](docs/figures/architecture.png)
 
-*Figure 2. The SwarmScope pipeline. Readers turn each record into one event (who, where, what it touched, warning flags, when). Events without a name or date go through estimation first; the rest go straight to the graphs. The detectors and the early-warning replay feed the viewers, a written report and a findings file.*
+*Figure 2. The SwarmScope pipeline. Loaders turn each record into one Event (who, where, what it touched, warning flags, when). Unsigned or undated events go through inference first; named and timed events go straight to the graphs. The detectors and the early-warning replay feed the viewers, a written report and a findings file.*
 
-- **Readers.** One for Swarm Traces, one for AI Village (chat, rooms, actions, role assignments, agents' notes and computer-use steps), and one for any file with one JSON record per line, given a map of which field means what.
-- **Estimation.** Names, dates and aliases for logs that hide them. Each step measures its own error on records held back for testing.
+- **Loaders.** One for Swarm Traces, one for AI Village (chat, rooms, actions, role assignments, agents' notes and computer-use steps), and one for any file with one JSON record per line, given a map of which field means what.
+- **Inference.** Names, dates and aliases for logs that hide them. Each step measures its own error on records held back for testing.
 - **Graphs.** An activity graph (agents and the resources they used) and an agent graph (which agents are tied to which). A shared resource counts more when few agents used it (Adamic–Adar [17]). Groups of closely tied agents are found with label propagation [31], a standard method.
 - **Detectors and early warning.** At each moment, every detector sees only what came before, so the replay shows what a live monitor would have seen.
 - **Outputs.** Two linked viewers that work offline (graph and world map, drawn with D3 [42]), a written `report.md` and a `findings.json` file.
@@ -115,7 +115,7 @@ Every log gets two linked views of the same data: a **world map** to replay what
 
 | log | agents | time span | content | used for |
 |---|---|---|---|---|
-| Swarm Traces [1] | ~700 (285 named) | Jul 2026 | 189,579 redacted records | a real attack; estimation; early warning |
+| Swarm Traces [1] | ~700 (285 named) | Jul 2026 | 189,579 redacted records | a real attack; inference; early warning |
 | AI Village `swarm-village` [2] | 133 | 24.3 h | chat, actions, agents' notes, 51,912 shell commands | one real incident (operator mistake) |
 | AI Village `game-jam`, `open-chat`, `main` [2] | 6, 23, 58 | 3–576 days | chat, agents' notes, computer use (9.0 GB for open-chat and main) | ordinary work, for false alarms; human influence |
 | Transluce urlquery reports [3] | — | 2023–2026 | 37,649 reports | the general reader on an outside log |
@@ -137,7 +137,7 @@ The incident timeline from METR and Redwood Research [4] gives the key moments o
 
 ### 3.5 How we tested it
 
-- **Held-out tests** for every estimation step: names are tested in 5 rounds on records held back; dates on 4,735 records with exact times; aliases by how well true pairs score above random ones [40].
+- **Held-out tests** for every inference step: names are tested in 5 rounds on records held back; dates on 4,735 records with exact times; aliases by how well true pairs score above random ones [40].
 - **Planted tests in real logs** (`scripts/validate_mission.py`). We add events with a known answer to a real log and run the tool's own detectors on the result: a pair of agents sharing k rare resources in Swarm Traces; spreading items with a known source for each pick-up in `swarm-village`, using its real agents and real addresses; and hidden channels of g agents used n times in `swarm-village` and `open-chat-village`. Unlike a made-up log, a real one keeps its real noise, rhythm and false alarms. No message content is read.
 - **Attack against ordinary work.** How often each hidden-channel flag fires per 1,000 events, in the attack log and in the four AI Village logs.
 - **Unit tests.** 21 tests on small logs with known answers.
@@ -163,7 +163,7 @@ We judge SwarmScope by its mission: show who talked to whom, how information spr
 
 ### 4.1 Who talked to whom
 
-**How well it works.** In AI Village every message names its sender and the agents it addresses, so the conversation graph is read straight from the log. In Swarm Traces the sender is hidden. Estimation raises the share of named events from 0.6% to 1.3%, at 95.3% accuracy on held-out records, and the share of dated events from 3.1% to 10.6%, with 93.7% of dates within a day (Appendix B). To check that a hidden pair would show up, we added two new agents that share k rare resources to the real Swarm Traces log. Among all agent pairs, the planted pair ranks 4th at k = 2 and **1st at k = 4, 8 and 16** (in each of 4 trials per k). The formal statistical test [26–29] is stricter: it accepts the pair only at k = 16 (4 of 4), and never at k ≤ 8. So the ranking spots a hidden pair early, and the test confirms it only when the evidence is strong.
+**How well it works.** In AI Village every message names its sender and the agents it addresses, so the conversation graph is read straight from the log. In Swarm Traces the sender is hidden. Inference raises the share of named events from 0.6% to 1.3%, at 95.3% accuracy on held-out records, and the share of dated events from 3.1% to 10.6%, with 93.7% of dates within a day (Appendix B). To check that a hidden pair would show up, we added two new agents that share k rare resources to the real Swarm Traces log. Among all agent pairs, the planted pair ranks 4th at k = 2 and **1st at k = 4, 8 and 16** (in each of 4 trials per k). The formal statistical test [26–29] is stricter: it accepts the pair only at k = 16 (4 of 4), and never at k ≤ 8. So the ranking spots a hidden pair early, and the test confirms it only when the evidence is strong.
 
 ![Figure 7](docs/figures/graph_swarm_traces.png)
 
@@ -278,7 +278,7 @@ We judge SwarmScope by its mission: show who talked to whom, how information spr
 **What this means.** Looking at the group shows things that watching single agents misses: days of warning before a real attack, power handed over by the group, and a goal change that only the agents' private notes reveal. Overseeing swarms therefore needs logs with stable agent IDs and times [9], and access to agents' own goals or notes, not only their messages. And every alarm's false-alarm rate on ordinary work must be measured before anyone trusts it.
 
 **Limitations.**
-- **Hidden fields.** In Swarm Traces, only 1.3% of events are named and 10.6% dated, even after estimation. The dated part may not represent the whole swarm, and the evidence for aliases is weak (AUC 0.63, where 0.5 is chance). The authors hid these fields on purpose [1].
+- **Hidden fields.** In Swarm Traces, only 1.3% of events are named and 10.6% dated, even after inference. The dated part may not represent the whole swarm, and the evidence for aliases is weak (AUC 0.63, where 0.5 is chance). The authors hid these fields on purpose [1].
 - **One real incident per dataset.** The warning times come from one attack and one operator mistake. They are case studies, not success rates.
 - **Detectors that rely on wording.** Role claims and role changes are found only when an agent writes them out ("my role is …"). An agent that simply uses a power without saying so is missed.
 - **Who passed an item to whom** is reliable only when the item followed a direct address, and real logs do not record which ones did. Without addresses (items seen in a room, or any redacted log) the named source is a guess at chance level; how far and how fast the item spread are still exact.
@@ -376,7 +376,7 @@ For oversight, the results point to two needs: logs with stable agent IDs and ti
 | Uptake, lift | reuse of a viewer's rare words or links within 10 minutes; rate after ÷ rate before | our rule, after [16] |
 | Combined alarm | K different kinds of signal within 6 hours | our rule |
 
-## Appendix B. Estimation accuracy by setting (Swarm Traces, held-out)
+## Appendix B. Inference accuracy by setting (Swarm Traces, held-out)
 
 | setting | names: share correct | names: share of agents covered | events named | dates: median error (h) | dates within a day | events dated |
 |---|---|---|---|---|---|---|
