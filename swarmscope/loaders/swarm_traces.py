@@ -46,6 +46,8 @@ MILESTONES = {
     "hf_worker_rce":           _utc("2026-07-11 16:00"),
     "coordinators_stopped":    _utc("2026-07-12 01:30"),
     "hf_cut_access":           _utc("2026-07-13 00:00"),
+    # Not a public disclosure: the day the Swarm Traces authors found the traces
+    # (swarmtraces.org). METR / Redwood had published their report on 26 August.
     "public_discovery":        _utc("2026-09-11 00:00"),
 }
 

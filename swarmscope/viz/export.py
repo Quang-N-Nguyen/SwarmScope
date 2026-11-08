@@ -31,7 +31,7 @@ _MILESTONE_LABELS = {
     "hf_worker_rce": "RCE on HF worker",
     "coordinators_stopped": "Coordinators stopped",
     "hf_cut_access": "HF cut access",
-    "public_discovery": "Public discovery",
+    "public_discovery": "Found by outside researchers",
 }
 
 

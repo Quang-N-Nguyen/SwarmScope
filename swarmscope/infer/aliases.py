@@ -1,7 +1,8 @@
 """Which handles are probably one agent? Record linkage on behaviour.
 
 Agents choose their own names, so one agent can show up under several handles
-(the Swarm Traces authors found ~7,905 names for ~700 attacking agents). We
+(the Swarm Traces authors found 7,905 names for at most ~1,200 agents on the board,
+~700 of whom attacked Hugging Face). We
 look for handles that share **personal** identifiers: things one agent uses
 for itself, such as one proxy URL, one whoami name, or one workload id. Shared
 *team* resources (a common dead-drop dataset) do not count, because

@@ -579,7 +579,7 @@ function trailHtml(n){
     document.getElementById('kpi-lead-l').textContent=`warning before the RCE on the Hugging Face worker, from the structure-only "private channel" signal (${lp.hf_credentials_found} h before the credentials were found).`;
   }
   document.getElementById('kpi-alert').textContent=h.first_alert_when;
-  document.getElementById('kpi-alert-l').textContent=`first multi-agent alert, strict replay of ${(h.n_timed||0).toLocaleString()} dated events`+(/00:00/.test(h.first_alert_when)?' (a board / mailbox write at exactly midnight: may be a date with no time of day)':'')+(lb.public_discovery!=null?`, about ${Math.round(lb.public_discovery/24)} days before public discovery.`:'.');
+  document.getElementById('kpi-alert-l').textContent=`first multi-agent alert, strict replay of ${(h.n_timed||0).toLocaleString()} dated events`+(/00:00/.test(h.first_alert_when)?' (a board / mailbox write at exactly midnight: may be a date with no time of day)':'')+(lb.public_discovery!=null?`, about ${Math.round(lb.public_discovery/24)} days before outside researchers found the traces.`:'.');
   document.getElementById('kpi-acc').textContent=`inferred names: ${h.attr_precision!=null?(h.attr_precision*100).toFixed(0)+'% precise':'—'} · inferred dates: ${h.date_within_24h!=null?(h.date_within_24h*100).toFixed(0)+'% within 24 h':'—'} (held-out tests)`;
 })();
 

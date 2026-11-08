@@ -43,7 +43,13 @@ def main():
         dst = os.path.join(OUT, v)
         os.makedirs(os.path.dirname(dst), exist_ok=True)
         shutil.copy(v, dst)
-    shutil.copy(os.path.join(HERE, "index.html"), os.path.join(OUT, "index.html"))
+    # The page source is body-only (it can also be hosted as a page). Served as a
+    # file it needs a document skeleton, or "·" and "→" render as "Â·" / "â†'".
+    page = open(os.path.join(HERE, "index.html"), encoding="utf-8").read()
+    if not page.lstrip().lower().startswith("<!doctype"):
+        page = ('<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n'
+                '<meta name="viewport" content="width=device-width, initial-scale=1">\n' + page + "\n</html>\n")
+    open(os.path.join(OUT, "index.html"), "w", encoding="utf-8").write(page)
     print("built", OUT)
 
 

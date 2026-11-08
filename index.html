@@ -182,7 +182,7 @@ footer{font-size:13px; color:var(--muted); border-top:1px solid var(--line); pad
       <circle cx="769.2" cy="96" r="6" fill="var(--ink)"/>
       <text class="ev" x="763" y="36" text-anchor="end" font-weight="600">RCE on HF worker</text><text x="763" y="52" text-anchor="end">+44.7 h</text>
       <line x1="769.2" y1="58" x2="769.2" y2="90" stroke="var(--line)"/>
-      <text x="40" y="142">Public discovery came on 11 Sep, 63–64 days after the first signals.</text>
+      <text x="40" y="142">Outside researchers found the traces on 11 Sep, 63–64 days after the first signals.</text>
     </svg>
   </div>
   <p class="cap">Strict replay: only names and dates read from the data, and each signal uses only the past. Milestones from the METR / Redwood report.</p>
@@ -190,7 +190,7 @@ footer{font-size:13px; color:var(--muted); border-top:1px solid var(--line); pad
 
 <section class="score" aria-labelledby="score-t">
   <h2 id="score-t">How well it works</h2>
-  <p class="cap">Each test plants something with a known answer into a real log and runs SwarmScope's own detectors on it, or uses blind labels.</p>
+  <p class="cap">Each test plants something with a known answer into a real log and runs SwarmScope's own detectors on it, or replays a real incident.</p>
   <div class="tbl">
     <table>
       <thead><tr><th>mission</th><th>test</th><th>result</th><th>verdict</th></tr></thead>
@@ -200,7 +200,6 @@ footer{font-size:13px; color:var(--muted); border-top:1px solid var(--line); pad
         <tr><td>Covert channels</td><td>Planted hidden channels in real benign logs</td><td>100% found within the group-size limit with 6+ uses, in 2–5 h; never found for groups of 4+</td><td><span class="pill part">partly</span></td></tr>
         <tr><td>Hidden-channel flags</td><td>Flag rate, attack vs four benign villages</td><td>Shortener chains, credentials, registries, board, Kubernetes mark the attack log; image read-back, locks, DNS do not</td><td><span class="pill part">partly</span></td></tr>
         <tr><td>Flag early</td><td>Real attack, two real incidents, three benign villages</td><td>44.7 h before the RCE; both incidents caught; 0–0.73 false alarms per active day</td><td><span class="pill ok">works</span></td></tr>
-        <tr><td>Misbehaviour</td><td>Blind-labelled samples</td><td>Role claims 86% precise, role drift 100% precise; each misses about half</td><td><span class="pill ok">works</span></td></tr>
       </tbody>
     </table>
   </div>
@@ -224,7 +223,7 @@ footer{font-size:13px; color:var(--muted); border-top:1px solid var(--line); pad
       </div>
     </div>
     <figure class="f-fig">
-      <img src="docs/figures/fig2_viewer_swarm_traces.png" alt="SwarmScope viewer on Swarm Traces: agents as circles, shared resources as squares, a timeline of dated events with incident milestones and the first firing of each signal." loading="lazy">
+      <img src="docs/figures/graph_swarm_traces.png" alt="SwarmScope viewer on Swarm Traces: agents as circles, shared resources as squares, a timeline of dated events with incident milestones and the first firing of each signal." loading="lazy">
       <figcaption>The graph view on Swarm Traces. Orange chips mark the first firing of each signal; dark lines are incident milestones.</figcaption>
     </figure>
   </article>
@@ -245,7 +244,7 @@ footer{font-size:13px; color:var(--muted); border-top:1px solid var(--line); pad
       </div>
     </div>
     <figure class="f-fig">
-      <img src="docs/figures/fig5_god_endorsement.png" alt="Running count of agents that addressed each claimant as god: coral-delta rises to 73, the assigned god green-epsilon to 39, ruby-theta to 15." loading="lazy">
+      <img src="docs/figures/god_endorsement.png" alt="Running count of agents that addressed each claimant as god: coral-delta rises to 73, the assigned god green-epsilon to 39, ruby-theta to 15." loading="lazy">
       <figcaption>Agents addressing each claimant as "god", each counted from its own first claim.</figcaption>
     </figure>
   </article>
@@ -266,7 +265,7 @@ footer{font-size:13px; color:var(--muted); border-top:1px solid var(--line); pad
       </div>
     </div>
     <figure class="f-fig">
-      <img src="docs/figures/fig4_memory_drift.png" alt="Bar chart of the share of goal statements naming a role the agent was not assigned: zero until 12:50, then rising to near 100 percent; alert at 13:02." loading="lazy">
+      <img src="docs/figures/memory_drift.png" alt="Bar chart of the share of goal statements naming a role the agent was not assigned: zero until 12:50, then rising to near 100 percent; alert at 13:02." loading="lazy">
       <figcaption>Share of the agents' own goal statements that name a role they were not assigned.</figcaption>
     </figure>
   </article>

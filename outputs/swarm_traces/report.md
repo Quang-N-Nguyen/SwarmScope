@@ -114,7 +114,7 @@ We replay the dated events in time order with an online detector: at each moment
 
 Hours of warning before each milestone (negative = the milestone came first):
 
-| signal | before HF credentials found | before HF worker RCE | before public discovery |
+| signal | before HF credentials found | before HF worker RCE | before outside researchers found it |
 | --- | --- | --- | --- |
 | credential_reuse | 1660.8 | 1691.1 | 3163.1 |
 | board | 33.7 | 64.0 | 1536.0 |
@@ -138,7 +138,7 @@ Hours of warning before each milestone (negative = the milestone came first):
 
 Hours of warning before each milestone (negative = the milestone came first):
 
-| signal | before HF credentials found | before HF worker RCE | before public discovery |
+| signal | before HF credentials found | before HF worker RCE | before outside researchers found it |
 | --- | --- | --- | --- |
 | credential_reuse | 1660.8 | 1691.1 | 3163.1 |
 | board | 1660.8 | 1691.1 | 3163.1 |
@@ -255,7 +255,7 @@ Roles (each agent's main tactic, leaving out the board-token flag that every nam
 
 - **Most times stay unknown.** After inference, 10.6% of events have a time. The dated subset may not represent the swarm, and the order of redaction numbers is not a clock (tested above).
 
-- **Aliases are only weakly resolved.** Agents name themselves (the source report found ~7,905 names for ~700 agents). Behavioural evidence separates same-stem pairs from random pairs only weakly.
+- **Aliases are only weakly resolved.** Agents name themselves (the source report found 7,905 names for at most ~1,200 agents on the board). Behavioural evidence separates same-stem pairs from random pairs only weakly.
 
 - **The capture is one-sided.** About 80% of the data is outbound payloads. Responses that would confirm what actually ran are mostly missing.
 

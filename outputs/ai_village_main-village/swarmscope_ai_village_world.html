@@ -383,7 +383,9 @@ tiles.forEach(T=>{
   const evC=[],evP=[]; let nev=0,ns=0;
   T.nodes.forEach(n=>{ (n.ev||[]).forEach(r=>{ if(r[0]!=null) evC.push(r[0]); evP.push(r[1]); }); nev+=(n.n_ev||n.c||0); ns+=(n.ev||[]).length; });
   evC.sort((a,b)=>a-b); evP.sort((a,b)=>a-b);
-  Object.assign(T,{evC,evP,scale:ns?Math.max(1,nev/ns):1,total:Math.max(nev,d3.sum(T.nodes,n=>n.c||0)),
+  // "events" = events the agent wrote (its trail). The graph's node count also
+  // includes being addressed or touched, so it is used only when there is no trail.
+  Object.assign(T,{evC,evP,scale:ns?Math.max(1,nev/ns):1,total:ns?nev:d3.sum(T.nodes,n=>n.c||0),
     t0:d3.min(T.nodes,n=>n.t0), p0:d3.min(T.nodes,n=>n.p0), obs:d3.sum(T.nodes,n=>n.obs||0),
     status:(ATTR&&T.kind==='agent')?(T.nodes[0].comm||0):0, role:T.nodes[0].role, mech:T.kind==='agent'?(T.nodes[0].mech||[]):[]});
 });
@@ -732,11 +734,13 @@ function renderNotes(){
       g.select('.hd').attr('d',`M${d.ex},${d.ey}l${-9*Math.cos(d.ang-0.45)},${-9*Math.sin(d.ang-0.45)}l${9*Math.cos(d.ang-0.45)-9*Math.cos(d.ang+0.45)},${9*Math.sin(d.ang-0.45)-9*Math.sin(d.ang+0.45)}Z`); });
 }
 
-let lastPanel=0;
+let lastPanel=0, panelTimer=0;
 function render(force){
   renderTiles(); renderTies(); renderArcs(); renderFollow(); renderNotes();
   const now=performance.now();
+  clearTimeout(panelTimer);
   if(force||now-lastPanel>220){ lastPanel=now; renderLive(); }
+  else panelTimer=setTimeout(()=>{ lastPanel=performance.now(); renderLive(); },230);
   drawSpark();
   $('tread').innerHTML = axis==='clock' ? `${iso(t).slice(0,10)}<br>${iso(t).slice(11,16)} UTC` : `#${nf(t)}<br>of ${nf(MAXPOS)}`;
 }
@@ -887,7 +891,7 @@ function listAgents(){
   $('alist').querySelectorAll('li').forEach(li=>li.addEventListener('click',()=>{ select(tiles[+li.dataset.i]); focusOn(tiles[+li.dataset.i]); }));
 }
 function detailHtml(T){
-  const n=T.nodes[0], rows=[['events so far',`${nf(countAt(T,t))} of ${nf(T.total)}`]];
+  const n=T.nodes[0], rows=[['events written so far',`${nf(countAt(T,t))} of ${nf(T.total)}`]];
   if(T.kind==='viewers') rows.push(['viewers',nf(T.nodes.length)]);
   if(T.t0!=null) rows.push(['first seen',fmtTime(T.t0)]);
   const tn=d3.max(T.nodes,x=>x.tn); if(tn!=null&&tn!==T.t0) rows.push(['last seen',fmtTime(tn)]);
@@ -1094,8 +1098,10 @@ setBounds(); t=hi;
 renderOverview(); renderLayers(); renderHelp();
 sparkBins=null;
 fit(false);
-openView(innerWidth<=820?'world':'world');
-if(innerWidth<=820) $('p-close').click();
+openView('world');
+// Narrow windows (phones, or the viewer embedded in the workbench): start with
+// the panel collapsed so it does not sit under the dock; the rail reopens it.
+if(innerWidth<1180){ $('p-close').click(); fit(false); }
 render(true);
 let rz; window.addEventListener('resize',()=>{ clearTimeout(rz); rz=setTimeout(()=>{ sparkBins=null; fit(false); render(true); },150); });
 // deep links: #coord (ties), #follow-<n>, #play, #fx, #fx-<n>; combine with "-" (e.g. #coord-follow-9-play)

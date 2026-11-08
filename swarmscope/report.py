@@ -676,7 +676,7 @@ def to_markdown(log: EventLog, f: dict) -> str:
         per = tc.get("lead_hours_by_signal") or {}
         if per:
             L.append("\nHours of warning before each milestone (negative = the milestone came first):\n")
-            L.append(_md_table(["signal", "before HF credentials found", "before HF worker RCE", "before public discovery"],
+            L.append(_md_table(["signal", "before HF credentials found", "before HF worker RCE", "before outside researchers found it"],
                                [(sg, v.get("hf_credentials_found"), v.get("hf_worker_rce"), v.get("public_discovery"))
                                 for sg, v in sorted(per.items(), key=lambda x: -(x[1].get("hf_worker_rce") or -1e9))]))
         L.append("")
@@ -824,8 +824,8 @@ def _blind_spots(log: EventLog, f: dict) -> str:
         "between agents that never signed anything is still invisible.",
         f"**Most times stay unknown.** After inference, {_pct(dated)} of events have a time. The dated subset "
         "may not represent the swarm, and the order of redaction numbers is not a clock (tested above).",
-        "**Aliases are only weakly resolved.** Agents name themselves (the source report found ~7,905 names "
-        "for ~700 agents). Behavioural evidence separates same-stem pairs from random pairs only weakly.",
+        "**Aliases are only weakly resolved.** Agents name themselves (the source report found 7,905 names "
+        "for at most ~1,200 agents on the board). Behavioural evidence separates same-stem pairs from random pairs only weakly.",
         "**The capture is one-sided.** About 80% of the data is outbound payloads. Responses that would "
         "confirm what actually ran are mostly missing.",
         "**Encrypted or deleted content is opaque.** We see that a signed or encrypted channel existed, not "
