@@ -98,17 +98,32 @@ def _forensics(log: EventLog, findings: dict) -> Optional[dict]:
 
 def _cascades(findings: dict, per_kind: int = 3) -> list:
     """Transmission trees to animate on the graph: who probably passed an item
-    to whom, and when. Edge i of a tree is the adoption at times[i + 1]."""
+    to whom, and when. Edge i of a tree is the adoption at times[i + 1].
+
+    Named-speaker logs (AI Village) give files, commits, coined terms and role
+    claims. Redacted logs (Swarm Traces) give credentials and dead-drop
+    datasets, from the real-clock spread table (``research.cascades``); an
+    edge whose adopter was named by inference carries ``inf=True`` so the
+    viewer can draw it dashed.
+    """
     A = findings.get("attributed") or {}
     out = []
 
-    def add(kind, label, origin, tree, times):
+    def add(kind, label, origin, tree, times, inferred=None):
         if not tree or not times:
             return
-        edges = [dict(s="agent:" + str(p), t="agent:" + str(c), ts=times[i + 1])
+        edges = [dict(s="agent:" + str(p), t="agent:" + str(c), ts=times[i + 1],
+                      **({"inf": True} if inferred and i + 1 < len(inferred) and inferred[i + 1] else {}))
                  for i, (p, c) in enumerate(tree) if p and i + 1 < len(times)]
         out.append(dict(kind=kind, label=label, origin="agent:" + str(origin), first_ts=times[0],
                         reach=len(times), edges=edges))
+
+    if not A:
+        kinds = {"credential": "credential", "destination": "dead-drop"}
+        for it in (findings.get("research") or {}).get("cascades") or []:
+            rt, _, rid = it["item"].partition(":")
+            add(kinds.get(rt, rt), it["item"], it["origin"], it.get("tree"), it.get("times"), it.get("inferred"))
+        return out
 
     df = A.get("diffusion") or {}
     for kind, name in (("files", "file"), ("commits", "commit"), ("terms", "term")):
@@ -124,6 +139,43 @@ def _cascades(findings: dict, per_kind: int = 3) -> list:
             out.append(dict(kind="claim", label=f"{c['agent']} as {role}" + (" (assigned)" if c["assigned"] else " (not assigned)"),
                             origin="agent:" + c["agent"], first_ts=c["first_claim"], reach=len(uses) + 1,
                             edges=[dict(s="agent:" + a, t="agent:" + c["agent"], ts=t) for t, a in uses]))
+    return out
+
+
+EVENTS_PER_AGENT = 200
+_TRAIL_FLAGS = ("board_token", "mailbox", "image_exfil", "dns_exfil", "signed_cmd", "lock_dupctrl",
+                "loot", "tunnel", "k8s", "container_registry", "cleanup", "external_llm", "credential_use",
+                "eval_target", "task_submit")
+
+
+def _agent_trails(log: EventLog, prefer_time: bool = True, per_agent: int = EVENTS_PER_AGENT) -> Dict[str, dict]:
+    """``agent -> {"ev": rows, "n_ev": total}``: what each named agent did, in order.
+
+    A row is ``[ts, pos, kind, target, recipients, flags, inferred]``:
+    ``target`` is the channel or first shared resource the event touched,
+    ``flags`` the mechanism flags that fired, ``inferred`` 1 when the author
+    came from inference. More than ``per_agent`` events are thinned to an even
+    sample (first and last kept), so a long history still shows its shape.
+    """
+    ordered = log.sorted_events(prefer_time)
+    rows: Dict[str, list] = defaultdict(list)
+    for pos, e in enumerate(ordered):
+        who = e.who(True)
+        if not who:
+            continue
+        target = e.channel
+        if not target:
+            refs = e.all_refs()
+            target = refs[0] if refs else None
+        flags = [f for f in _TRAIL_FLAGS if e.features.get(f)]
+        rows[who].append([e.ts, pos, e.kind, target, e.recipients[:3], flags, 1 if e.actor is None else 0])
+    out = {}
+    for who, lst in rows.items():
+        n = len(lst)
+        if n > per_agent:
+            step = (n - 1) / (per_agent - 1)
+            lst = [lst[round(i * step)] for i in range(per_agent)]
+        out[who] = dict(ev=lst, n_ev=n)
     return out
 
 
@@ -154,6 +206,12 @@ def build_graph_data(log: EventLog, findings: Optional[dict] = None,
             if gl:
                 goal_now["agent:" + a] = gl[-1][1].split("—")[0].strip()[:40]
 
+    # ---- what each agent did: a short event list per agent node
+    # [ts, pos, kind, target, recipients, flags, inferred]. Long histories are
+    # thinned to an even sample of EVENTS_PER_AGENT rows; ``n_ev`` keeps the
+    # true count. Only ids, kinds and flags: never the text of a payload.
+    trail = _agent_trails(log, prefer_time)
+
     # ---- nodes
     nodes = []
     for nid, n in act.nodes.items():
@@ -171,7 +229,8 @@ def build_graph_data(log: EventLog, findings: Optional[dict] = None,
             mech=[m for m, _ in n["features"].most_common(3)],
             obs=n.get("obs"), inf=n.get("inf"),
             role=r.get("role"), spec=r.get("specialisation"), tac=r.get("tactics"),
-            led=ld.get("led"), fol=ld.get("followed"), betw=brokers.get(lab)))
+            led=ld.get("led"), fol=ld.get("followed"), betw=brokers.get(lab),
+            **(trail.get(lab) or {})))
 
     # ---- activity edges, aggregated by (src, dst, kind)
     agg: Dict[tuple, dict] = {}
@@ -293,7 +352,7 @@ def build_graph_data(log: EventLog, findings: Optional[dict] = None,
                         role_before=rc and rc["before"]["share"], role_after=rc and rc["after"]["share"],
                         drift_alert=((A.get("actions") or {}).get("role_drift") or {}).get("alert"))
     forensics = _forensics(log, findings) if attributed else None
-    cascades = _cascades(findings) if attributed else []
+    cascades = _cascades(findings)
     s = findings.get("summary", {})
     return dict(
         meta=dict(source=log.name, axis=act.axis, n_events=len(log), attributed=attributed,

@@ -12,7 +12,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from swarmscope.events import Event, EventLog                         # noqa: E402
 from swarmscope.detectors import (changepoint, conversation, diffusion, authority,  # noqa: E402
-                                  rooms, emergence, influence, early_warning)
+                                  rooms, emergence, influence, early_warning, research)
+from swarmscope import report                                           # noqa: E402
+from swarmscope.viz import export                                       # noqa: E402
 
 T0 = 1788084000.0   # 2026-08-30 10:00 UTC
 
@@ -154,6 +156,73 @@ def test_influence_uptake_beats_before_window():
     r = influence.run_all(EventLog(ev))
     assert r["all_human"]["rate_after"] == 0.5 and r["all_human"]["rate_before"] == 0.0
     assert r["instructions"]["count"] == 30
+
+
+# ---------------------------------------------------------------- redacted-log cascades, bursts, trails
+def redacted(i, actor, cred, ts, precision="second", inferred=False):
+    """A Swarm Traces-style event: a credential touched at a time, by a signed or inferred author."""
+    e = Event(event_id=f"r{i}", source="test", seq=i, kind="payload", channel=None,
+              refs={"credential": [cred]}, features={"credential_use": True},
+              ts=ts, ts_source="embedded", ts_precision=precision)
+    if inferred:
+        e.actor_inferred, e.actor_inferred_conf = actor, 0.9
+    else:
+        e.actor, e.actor_conf = actor, 0.8
+    return e
+
+
+def test_cascade_tree_uses_latest_earlier_user():
+    # A at 10:00, B at 10:05, C at 10:30 (C by inference) -> A->B, B->C; C marked inferred
+    ev = [redacted(0, "A", "7", T0), redacted(1, "B", "7", T0 + 300),
+          redacted(2, "C", "7", T0 + 1800, inferred=True), redacted(3, "A", "7", T0 + 3600)]
+    rows = research.cascades(EventLog(ev))
+    assert len(rows) == 1 and rows[0]["item"] == "credential:7" and rows[0]["origin"] == "A"
+    assert rows[0]["tree"] == [("A", "B"), ("B", "C")]
+    assert rows[0]["times"] == [T0, T0 + 300, T0 + 1800]
+    assert rows[0]["inferred"] == [False, False, True]
+
+
+def test_bursts_skip_day_only_dates():
+    noon = T0 + 2 * 3600                      # T0 is 10:00 UTC, so this is 12:00 UTC
+    ev = [redacted(i, "A", "1", noon, precision="day") for i in range(500)]   # a date with no time of day
+    ev += [redacted(500 + i, "B", "1", T0 + i * 600) for i in range(48)]      # one event every 10 min
+    ev += [redacted(600, "C", "1", noon + 86400, precision="inferred")]       # inferred, exactly noon
+    b = research.bursts(EventLog(ev))
+    hours = [r["hour"] for r in b["bursts"]]
+    assert all(" 12:00 " not in h for h in hours), hours
+    assert b["day_dated_skipped"] == 501
+    assert research.clock_precise(redacted(0, "A", "1", noon, precision="inferred")) is False
+    assert research.clock_precise(redacted(0, "A", "1", noon + 60, precision="inferred")) is True
+
+
+def test_viewer_gets_cascades_and_trails_on_redacted_log():
+    # 20 agents, 1 event in 30 signed (so the log counts as redacted); one credential spreads A0 -> A1 -> A2
+    rng = random.Random(1)
+    ev = []
+    for i in range(3000):
+        actor = f"A{(i // 30) % 20}" if i % 30 == 0 else None
+        e = redacted(i, actor or "x", str(rng.randint(1, 3)), T0 + i * 60)
+        if actor is None:
+            e.actor, e.actor_conf = None, 0.0
+        ev.append(e)
+    for k, a in enumerate(("A0", "A1", "A2")):
+        ev.append(redacted(1000 + k, a, "9", T0 + 40000 + k * 300))
+    for k in range(600):                                               # one long history, to be thinned
+        ev.append(redacted(2000 + k, "A0", "1", T0 + 50000 + k * 30))
+    log = EventLog(ev)
+    assert not report.is_attributed(log)
+    f = report.analyze(log, inference="off")
+    g = export.build_graph_data(log, f)
+    kinds = {c["kind"] for c in g["cascades"]}
+    assert "credential" in kinds, g["cascades"][:2]
+    c9 = next(c for c in g["cascades"] if c["label"] == "credential:9")
+    assert c9["origin"] == "agent:A0" and c9["reach"] == 3
+    assert [(e["s"], e["t"]) for e in c9["edges"]] == [("agent:A0", "agent:A1"), ("agent:A1", "agent:A2")]
+    a0 = next(n for n in g["nodes"] if n["id"] == "agent:A0")
+    assert a0["n_ev"] >= 600 and len(a0["ev"]) == export.EVENTS_PER_AGENT
+    assert a0["ev"][0][1] <= a0["ev"][-1][1]                            # kept in order
+    assert all(len(r) == 7 for r in a0["ev"])
+    assert next(n for n in g["nodes"] if n["ty"] != "agent").get("ev") is None
 
 
 if __name__ == "__main__":
