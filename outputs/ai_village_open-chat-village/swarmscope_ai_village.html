@@ -224,7 +224,7 @@
     <div id="fx" hidden>
       <div class="fx-intro">
         <h2 class="fx-h">What happened, hour by hour</h2>
-        <p class="hint" style="margin:0">All charts share one clock (UTC). Grey lines are the milestones (operator announcements or new village goals). Hover a chart to read the values.</p>
+        <p class="hint" style="margin:0">All charts share one clock (UTC). Grey lines are the milestones (operator announcements or new goals), when the log has them. Hover a chart to read the values.</p>
       </div>
       <div id="fx-charts"></div>
     </div>
@@ -517,7 +517,7 @@ function renderDetail(n){
       document.getElementById('kpi-alert-l').textContent=`at ${new Date(h.claim.ts*1000).toISOString().slice(11,16)} UTC without being assigned the role; ${h.claim.endorsers} agents then addressed it as god.`;
     } else {
       document.getElementById('kpi-alert').textContent='No role claims';
-      document.getElementById('kpi-alert-l').textContent='This village assigns no privileged role, or no agent claimed one it was not given.';
+      document.getElementById('kpi-alert-l').textContent='No privileged role is assigned in this log, or no agent claimed one it was not given.';
     }
     document.getElementById('kpi-acc').textContent='Names and times are in the data (no inference). Dark timeline lines = milestones.';
     return;
@@ -624,7 +624,7 @@ function applyAxis(){
     ? (META.attributed ? 'Real time, read from the log (every event has one).' : `Real time. Only events with a date are shown: dates read from the data plus inferred dates (${pct(META.dated_total_frac)} of events).`)
     : 'Every event, in the order the reconstruction found its resources. This is not a clock: a held-out test showed it predicts time worse than guessing the median day.';
   document.getElementById('axis-note').textContent = axis==='clock'
-    ? (META.attributed ? 'Bars: events per time slice. Dark lines: milestones. Amber: first firing of each Swarm Traces signal (on this benign swarm, these are false alarms).'
+    ? (META.attributed ? 'Bars: events per time slice. Dark lines: milestones. Amber: first firing of each Swarm Traces signal (each one is a lead to check, not a confirmed channel).'
        : 'Bars: dated events per time slice (dark = date read from the data, light = inferred). Dark lines: incident milestones (METR / Swarm Traces). Amber: first firing of each signal in the strict replay.')
     : 'Bars: share of events in each slice that are board / mailbox writes. Amber: first firing of each signal in this order.';
   applyRange();

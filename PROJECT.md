@@ -185,7 +185,7 @@ For oversight, the results point to two needs: interaction logs with stable agen
 
 - **Code:** https://github.com/Quang-N-Nguyen/SwarmScope (Python 3.9+, standard library only; `README.md` has the commands).
 - **Data:** Swarm Traces [1] (public, redacted); AI Village [2] (gated, research terms, not redistributed); Transluce [3].
-- **Artifacts:** offline HTML viewers in `outputs/*/`; one report per log in `outputs/*/report.md`.
+- **Artifacts:** offline HTML viewers in `outputs/*/`; one report per log in `outputs/*/report.md`; a results page (`index.html`); and an in-browser workbench (`platform/`) that runs the same Python engine on a visitor's own log through Pyodide, with no server.
 - **Info hazards:** the tool never prints Swarm Traces payload text; reports show IDs, counts and flags only. AI Village texts are masked for secrets before they are stored.
 
 ## Author Contributions

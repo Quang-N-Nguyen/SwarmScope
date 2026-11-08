@@ -8,3 +8,6 @@ data/
 
 # findings.json is large (~1.6 MB) and can be regenerated; keep report + viewer
 outputs/**/findings.json
+
+# Built platform (Pyodide runtime, copies of viewers): python platform/build_platform.py
+platform/build/

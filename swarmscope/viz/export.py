@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import datetime as _dt
 import json
+from html import escape as html_escape
 import os
 from collections import Counter, defaultdict
 from typing import Dict, Optional
@@ -325,7 +326,9 @@ def write_html(graph_data: dict, out_html: str, title: str = "SwarmScope",
     """
     with open(os.path.join(_HERE, "template.html")) as f:
         tpl = f.read()
-    tpl = tpl.replace("/*__DATA__*/", json.dumps(graph_data)).replace("__TITLE__", title)
+    # "<\/" keeps text from the log (e.g. "</script>") from closing the data script.
+    data = json.dumps(graph_data).replace("</", "<\\/")
+    tpl = tpl.replace("/*__DATA__*/", data).replace("__TITLE__", html_escape(title))
     if mode == "artifact":
         html = tpl.replace("<script>/*__D3__*/</script>", f'<script src="{D3_CDN}"></script>')
     else:

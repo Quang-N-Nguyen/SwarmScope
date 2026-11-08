@@ -6,6 +6,7 @@ SwarmScope reads a multi-agent log and rebuilds who talked to whom, how informat
 
 - **Paper and results:** [`PROJECT.md`](PROJECT.md)
 - **Results page:** open [`index.html`](index.html) in a browser: five findings, each linked to the viewer view that shows it
+- **Platform (workbench):** explore the six viewers, or run SwarmScope on your own log in the browser (Pyodide; the file never leaves the browser). Build it with `python platform/build_platform.py` and serve `platform/build/`
 - **Viewers:** open `outputs/*/swarmscope_*.html` in a browser (works offline)
 - **Reports:** `outputs/*/report.md`; across villages: [`outputs/ai_village_comparison.md`](outputs/ai_village_comparison.md); combined alert: [`outputs/flag_early.md`](outputs/flag_early.md)
 
@@ -57,6 +58,7 @@ swarmscope/
 scripts/                            download, sweep_inference, compare_villages, flag_early, transluce_to_jsonl
 tests/                              synthetic, loader and detector tests
 docs/figures/                       figures used in PROJECT.md
+platform/                           in-browser workbench: page, entry point, sample log, build script
 outputs/<log>/                      report.md + viewer HTML (findings.json is regenerated, not committed)
 ```
 

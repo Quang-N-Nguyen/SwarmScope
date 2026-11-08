@@ -199,7 +199,7 @@ def _markdown_attributed(log: EventLog, f: dict) -> str:
                            [(k, _hm(v), lab.get(k, "")[10:]) for k, v in sorted(ms.items(), key=lambda x: x[1])]))
         L.append("")
     elif nh:
-        L.append(f"**No operator milestones.** Humans wrote {nh:,} messages here (in this village, viewers chat "
+        L.append(f"**No operator milestones.** Humans wrote {nh:,} messages here (humans chat "
                  "with the agents), so human messages are not rare announcements and cannot serve as ground "
                  "truth. Change-point alerts below are unlabelled.\n")
 
@@ -340,8 +340,12 @@ def _markdown_attributed(log: EventLog, f: dict) -> str:
             L.append("There are no milestones to score it against.\n")
     tc = f.get("early_warning", {}).get("timestamp_crosscheck", {})
     if tc.get("triggers"):
-        L.append("**False-alarm load of the Swarm Traces signals.** No covert channel is known in this village, "
-                 "so each firing is at best a lead for an investigator:\n")
+        if getattr(log, "village", None):
+            L.append("**False-alarm load of the Swarm Traces signals.** No covert channel is known in this village, "
+                     "so each firing is at best a lead for an investigator:\n")
+        else:
+            L.append("**Swarm Traces signals on this log.** Each firing is a lead for an investigator, "
+                     "not a confirmed channel:\n")
         tph = tc.get("triggers_per_hour", {})
         L.append(_md_table(["signal", "firings", "per hour"],
                            [(k, v, tph.get(k)) for k, v in sorted(tc["triggers"].items(), key=lambda x: -x[1])]))

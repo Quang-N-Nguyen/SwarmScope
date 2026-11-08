@@ -1,0 +1,387 @@
+<title>SwarmScope Workbench</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/4.3.0/marked.min.js"></script>
+<style>
+/* Layout: app shell; a top bar with two tabs; Explore = log list beside a full-height viewer; Analyze = a setup column beside the run log, then the result viewer full width. */
+:root{
+  --bg:#f3f6f5; --surface:#ffffff; --ink:#13201d; --muted:#566864; --line:#d3ddda;
+  --accent:#0f766e; --accent-soft:#d8efeb; --alert:#c2410c; --alert-soft:#fbe6da; --ok:#15803d;
+  --display:"Bricolage Grotesque", "Helvetica Neue", Arial, sans-serif;
+  --body:"IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+  --mono:"IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#0e1513; --surface:#151f1d; --ink:#e2ebe8; --muted:#94a7a2; --line:#27342f;
+  --accent:#34d1bd; --accent-soft:#16332f; --alert:#fb923c; --alert-soft:#3a2416; --ok:#4ade80; color-scheme:dark } }
+:root[data-theme="dark"]{
+  --bg:#0e1513; --surface:#151f1d; --ink:#e2ebe8; --muted:#94a7a2; --line:#27342f;
+  --accent:#34d1bd; --accent-soft:#16332f; --alert:#fb923c; --alert-soft:#3a2416; --ok:#4ade80; color-scheme:dark }
+*{box-sizing:border-box}
+body{background:var(--bg); color:var(--ink); font:15px/1.5 var(--body);
+  padding-left:max(16px, env(safe-area-inset-left, 0px)); padding-right:max(16px, env(safe-area-inset-right, 0px)); padding-block:0 32px}
+a{color:var(--accent)}
+button, input, select{font:inherit; color:inherit}
+:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+h1,h2,h3{font-family:var(--display); margin:0; text-wrap:balance; letter-spacing:-0.01em}
+p{margin:0}
+.label{font:500 12px/1.2 var(--mono); letter-spacing:.08em; text-transform:uppercase; color:var(--muted)}
+.muted{color:var(--muted)}
+.mono{font-family:var(--mono); font-variant-numeric:tabular-nums}
+
+.bar{display:flex; align-items:center; gap:20px; flex-wrap:wrap; padding-block:14px; border-bottom:1px solid var(--line); margin-bottom:20px}
+.brand{font:700 21px/1 var(--display)}
+.tabs{display:flex; gap:4px}
+.tab{border:1px solid transparent; background:none; padding:7px 12px; border-radius:4px; text-decoration:none; color:var(--muted); font-weight:500; cursor:pointer}
+.tab[aria-current="page"]{background:var(--accent-soft); color:var(--accent); border-color:var(--accent)}
+.bar .right{margin-left:auto; display:flex; gap:16px; font-size:14px; flex-wrap:wrap}
+
+.view{display:grid; gap:20px}
+.explore{display:grid; grid-template-columns:minmax(0,280px) minmax(0,1fr); gap:16px}
+.logs{display:grid; gap:8px; align-content:start}
+.log{display:grid; gap:4px; text-align:left; padding:12px; border:1px solid var(--line); border-radius:4px; background:var(--surface); cursor:pointer}
+.log[aria-pressed="true"]{border-color:var(--accent); box-shadow:inset 3px 0 0 var(--accent)}
+.log b{font:600 15px var(--display)}
+.log span{font-size:13px; color:var(--muted)}
+.log em{font:500 11px var(--mono); font-style:normal; color:var(--accent); letter-spacing:.04em; text-transform:uppercase}
+.frame{display:grid; gap:8px; min-width:0}
+.frame-head{display:flex; justify-content:space-between; align-items:baseline; gap:12px; flex-wrap:wrap}
+iframe.viewer{width:100%; height:max(560px, calc(100dvh - 150px)); border:1px solid var(--line); border-radius:4px; background:#fff; display:block}
+
+.analyze{display:grid; grid-template-columns:minmax(0,5fr) minmax(0,6fr); gap:20px; align-items:start}
+.panel{background:var(--surface); border:1px solid var(--line); border-radius:6px; padding:18px; display:grid; gap:16px}
+.intro{display:grid; gap:6px}
+.intro h2{font-size:24px}
+fieldset{border:0; margin:0; padding:0; display:grid; gap:8px; min-width:0}
+legend{padding:0; margin-bottom:6px}
+.choices{display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:8px}
+.choice{display:grid; gap:2px; padding:10px 12px; border:1px solid var(--line); border-radius:4px; cursor:pointer}
+.choice:has(input:checked){border-color:var(--accent); background:var(--accent-soft)}
+.choice input{position:absolute; opacity:0; pointer-events:none}
+.choice b{font-weight:600; font-size:14px}
+.choice span{font-size:12.5px; color:var(--muted)}
+.drop{border:1.5px dashed var(--line); border-radius:4px; padding:14px; display:grid; gap:6px; text-align:center}
+.drop.over{border-color:var(--accent); background:var(--accent-soft)}
+.drop input{max-width:100%}
+.map{display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:8px}
+.map label{display:grid; gap:3px; font-size:13px; color:var(--muted)}
+select, .txt{width:100%; padding:7px 8px; border:1px solid var(--line); border-radius:4px; background:var(--bg)}
+.row{display:flex; gap:10px; align-items:center; flex-wrap:wrap}
+.btn{display:inline-flex; align-items:center; gap:6px; padding:9px 14px; border-radius:4px; border:1px solid var(--accent); background:transparent; color:var(--accent); font-weight:500; cursor:pointer; text-decoration:none}
+.btn.primary{background:var(--accent); color:var(--surface)}
+.btn:disabled{opacity:.45; cursor:not-allowed}
+.note{font-size:13px; color:var(--muted)}
+.engine{display:flex; align-items:center; gap:8px; font-size:13px}
+.dot{width:9px; height:9px; border-radius:50%; background:var(--muted)}
+.dot.busy{background:var(--alert)} .dot.ready{background:var(--ok)}
+.runlog{font:12.5px/1.6 var(--mono); background:var(--bg); border:1px solid var(--line); border-radius:4px; padding:12px; height:220px; overflow:auto; white-space:pre-wrap; word-break:break-word; margin:0}
+.chips{display:flex; gap:8px; flex-wrap:wrap}
+.chip{display:grid; padding:8px 12px; border:1px solid var(--line); border-radius:4px; background:var(--surface)}
+.chip b{font:700 20px/1.1 var(--display); font-variant-numeric:tabular-nums}
+.chip span{font-size:12px; color:var(--muted)}
+.result{display:grid; gap:14px}
+.report{background:var(--surface); border:1px solid var(--line); border-radius:6px; padding:18px 20px; max-width:100%; overflow-x:auto}
+.report h1{font-size:22px; margin-bottom:8px} .report h2{font-size:18px; margin:18px 0 6px}
+.report p, .report li{max-width:80ch}
+.report table{border-collapse:collapse; font-size:13px; margin:8px 0; font-variant-numeric:tabular-nums}
+.report th,.report td{border-bottom:1px solid var(--line); padding:5px 10px; text-align:left; white-space:nowrap}
+.report code{font-family:var(--mono); font-size:.92em}
+details summary{cursor:pointer; font-weight:500}
+.err{color:var(--alert)}
+
+@media (max-width: 860px){
+  .explore, .analyze{grid-template-columns:minmax(0,1fr)}
+  .logs{grid-template-columns:repeat(2, minmax(0,1fr))}
+}
+@media (max-width: 520px){ .logs, .choices{grid-template-columns:minmax(0,1fr)} .map{grid-template-columns:repeat(2, minmax(0,1fr))} }
+</style>
+
+<div class="bar">
+  <span class="brand">SwarmScope</span>
+  <nav class="tabs" aria-label="Sections">
+    <a class="tab" href="#explore" id="tab-explore">Explore logs</a>
+    <a class="tab" href="#analyze" id="tab-analyze">Analyze your log</a>
+  </nav>
+  <div class="right">
+    <a href="https://claude.ai/artifact/RTJ4QhFXtRV4EUxpDPfywZ" target="_blank" rel="noopener">Results</a>
+    <a href="https://github.com/Quang-N-Nguyen/SwarmScope" target="_blank" rel="noopener">Code and paper</a>
+  </div>
+</div>
+
+<!-- EXPLORE -->
+<section class="view" id="view-explore" aria-labelledby="tab-explore">
+  <div class="explore">
+    <div class="logs" id="logs" role="list"></div>
+    <div class="frame">
+      <div class="frame-head">
+        <div><span class="label" id="fr-kind"></span> <b id="fr-title"></b></div>
+        <a id="fr-open" class="note" href="#" target="_blank" rel="noopener">Open full screen</a>
+      </div>
+      <iframe class="viewer" id="fr" title="SwarmScope viewer"></iframe>
+    </div>
+  </div>
+</section>
+
+<!-- ANALYZE -->
+<section class="view" id="view-analyze" aria-labelledby="tab-analyze" hidden>
+  <div class="analyze">
+    <div class="panel">
+      <div class="intro">
+        <h2>Run SwarmScope on a log</h2>
+        <p class="muted">The engine runs here, in your browser. Your file is never uploaded.</p>
+      </div>
+
+      <fieldset>
+        <legend class="label">1 · Log</legend>
+        <div class="choices" id="fmt">
+          <label class="choice"><input type="radio" name="fmt" value="sample" checked><b>Sample log</b><span>Synthetic: 24 agents, 3 days, one side room</span></label>
+          <label class="choice"><input type="radio" name="fmt" value="generic"><b>Any JSONL log</b><span>One message per line; you map the fields</span></label>
+          <label class="choice"><input type="radio" name="fmt" value="swarm_traces"><b>Swarm Traces</b><span>redacted.jsonl.gz from swarmtraces.org</span></label>
+          <label class="choice"><input type="radio" name="fmt" value="ai_village"><b>AI Village</b><span>The .jsonl.gz tables of one village</span></label>
+        </div>
+      </fieldset>
+
+      <fieldset id="file-box" hidden>
+        <legend class="label">2 · File</legend>
+        <div class="drop" id="drop">
+          <input type="file" id="file" aria-label="Choose log file">
+          <span class="note" id="file-hint">Drop a file here or choose one.</span>
+        </div>
+      </fieldset>
+
+      <fieldset id="map-box">
+        <legend class="label" id="map-legend">2 · Fields</legend>
+        <div class="map" id="map"></div>
+        <p class="note" id="map-note">Fields are read from the first line. Only the speaker is needed; a time field enables the timeline.</p>
+      </fieldset>
+
+      <fieldset id="inf-box" hidden>
+        <legend class="label">3 · Inference of redacted names and dates</legend>
+        <select id="inf" aria-label="Inference preset">
+          <option value="off">Off: observed names and dates only (fastest)</option>
+          <option value="precise" selected>Precise</option>
+          <option value="balanced">Balanced (as in the paper; slowest)</option>
+        </select>
+      </fieldset>
+
+      <div class="row">
+        <button class="btn primary" id="run" disabled>Run SwarmScope</button>
+        <span class="engine"><span class="dot" id="eng-dot"></span><span id="eng">Engine not loaded</span></span>
+      </div>
+      <p class="note">Large logs take time: the 15 MB Swarm Traces file needs several minutes and a desktop browser.</p>
+    </div>
+
+    <div class="panel">
+      <span class="label">Run log</span>
+      <pre class="runlog" id="runlog" aria-live="polite">Pick a log and press Run. The first run loads the engine (about 14 MB).</pre>
+      <div class="chips" id="chips" hidden></div>
+    </div>
+  </div>
+
+  <div class="result" id="result" hidden>
+    <div class="frame-head"><h2 style="font-size:22px">Your viewer</h2><span class="note" id="res-time"></span></div>
+    <iframe class="viewer" id="res-frame" title="SwarmScope viewer for your log"></iframe>
+    <details class="report" open>
+      <summary>Report</summary>
+      <div id="report"></div>
+    </details>
+  </div>
+</section>
+
+<script>
+(function(){
+const $ = id => document.getElementById(id);
+const BASE = new URL('.', location.href).href;
+
+/* ---------- tabs (hash routing) ---------- */
+function route(){
+  const v = location.hash === '#analyze' ? 'analyze' : 'explore';
+  $('view-explore').hidden = v !== 'explore';
+  $('view-analyze').hidden = v !== 'analyze';
+  $('tab-explore').setAttribute('aria-current', v === 'explore' ? 'page' : 'false');
+  $('tab-analyze').setAttribute('aria-current', v === 'analyze' ? 'page' : 'false');
+  if (v === 'analyze') boot();
+}
+window.addEventListener('hashchange', route);
+
+/* ---------- explore ---------- */
+const LOGS = [
+  {k:'Swarm Traces', t:'The Hugging Face attack', d:'189,579 redacted records; names and dates inferred', f:'outputs/swarm_traces/swarmscope_swarm_traces.html'},
+  {k:'AI Village', t:'swarm-village', d:'133 agents, 24 h; false god, silent reshuffle', f:'outputs/ai_village_swarm-village/swarmscope_ai_village.html'},
+  {k:'AI Village', t:'main-village', d:'58 agents, 576 days; goal changes, side rooms', f:'outputs/ai_village_main-village/swarmscope_ai_village.html'},
+  {k:'AI Village', t:'open-chat-village', d:'23 agents, 436 viewers; human influence', f:'outputs/ai_village_open-chat-village/swarmscope_ai_village.html'},
+  {k:'AI Village', t:'game-jam-village', d:'6 agents, 3 days; benign control', f:'outputs/ai_village_game-jam-village/swarmscope_ai_village.html'},
+  {k:'Transluce', t:'urlquery reports', d:'37,649 reports; generic loader', f:'outputs/transluce/swarmscope_generic.html'},
+];
+const logsEl = $('logs');
+LOGS.forEach((l, i) => {
+  const b = document.createElement('button'); b.className = 'log'; b.type = 'button'; b.setAttribute('role','listitem');
+  b.innerHTML = `<em>${l.k}</em><b>${l.t}</b><span>${l.d}</span>`;
+  b.addEventListener('click', () => show(i)); logsEl.appendChild(b);
+});
+function show(i){
+  const l = LOGS[i];
+  [...logsEl.children].forEach((c, j) => c.setAttribute('aria-pressed', j === i ? 'true' : 'false'));
+  $('fr').src = l.f; $('fr-open').href = l.f; $('fr-kind').textContent = l.k + ' ·'; $('fr-title').textContent = l.t;
+}
+show(0);
+
+/* ---------- engine in a Web Worker ---------- */
+const WORKER = `
+let py = null;
+const stdlibCache = {};
+function patchFetch(base){
+  const of = self.fetch.bind(self);
+  const href = u => typeof u === 'string' ? u : (u instanceof URL ? u.href : (u && u.url) || '');
+  self.fetch = (u, o) => {
+    const s = href(u);
+    if (s.endsWith('python_stdlib.zip')) {
+      return of(base + 'pyodide/python_stdlib.b64.txt').then(r => r.text()).then(t => {
+        const b = atob(t.trim()); const a = new Uint8Array(b.length);
+        for (let i = 0; i < b.length; i++) a[i] = b.charCodeAt(i);
+        return new Response(a, {headers: {'Content-Type': 'application/zip'}});
+      });
+    }
+    return of(u, o);
+  };
+}
+self.onmessage = async (e) => {
+  const m = e.data;
+  try {
+    if (m.type === 'init') {
+      patchFetch(m.base);
+      importScripts(m.base + 'pyodide/pyodide.js');
+      py = await loadPyodide({indexURL: m.base + 'pyodide/'});
+      py.setStderr({batched: s => postMessage({type: 'log', text: s})});
+      py.setStdout({batched: s => postMessage({type: 'log', text: s})});
+      const B = await (await fetch(m.base + 'engine/swarmscope_bundle.json')).json();
+      for (const [p, src] of Object.entries(B)) {
+        const full = '/app/' + p; py.FS.mkdirTree(full.slice(0, full.lastIndexOf('/'))); py.FS.writeFile(full, src);
+      }
+      py.runPython('import sys; sys.path.insert(0, "/app"); import webrun');
+      postMessage({type: 'ready'});
+    } else if (m.type === 'run') {
+      py.runPython('import shutil, os\\nfor d in ("/data", "/out"):\\n    shutil.rmtree(d, ignore_errors=True)');
+      py.FS.mkdirTree('/data/in');
+      for (const f of m.files) py.FS.writeFile('/data/in/' + f.name, new Uint8Array(f.buf));
+      py.globals.set('ARGS', py.toPy(m.args));
+      const out = py.runPython('webrun.run(ARGS["path"], ARGS["fmt"], ARGS["fmap"], ARGS["inference"], None)');
+      postMessage({type: 'done', out});
+    }
+  } catch (err) { postMessage({type: 'error', text: String(err && err.message || err).slice(-1800)}); }
+};`;
+let worker = null, ready = false, booting = false, t0 = 0;
+function log(s, cls){ const el = $('runlog'); const line = document.createElement('div'); if (cls) line.className = cls; line.textContent = s; el.appendChild(line); el.scrollTop = el.scrollHeight; }
+function engine(state, text){ $('eng-dot').className = 'dot ' + state; $('eng').textContent = text; }
+function boot(){
+  if (booting) return; booting = true;
+  engine('busy', 'Loading engine (about 14 MB)…');
+  worker = new Worker(URL.createObjectURL(new Blob([WORKER], {type: 'text/javascript'})));
+  worker.onmessage = e => {
+    const m = e.data;
+    if (m.type === 'ready') { ready = true; engine('ready', 'Engine ready (Python in your browser)'); updateRun(); }
+    else if (m.type === 'log') log(m.text);
+    else if (m.type === 'done') finish(JSON.parse(m.out));
+    else if (m.type === 'error') { log('Error: ' + m.text, 'err'); engine('ready', 'Engine ready'); $('run').disabled = false; }
+  };
+  worker.onerror = e => { log('The engine could not start: ' + (e.message || 'unknown error'), 'err'); engine('', 'Engine failed to load'); };
+  worker.postMessage({type: 'init', base: BASE});
+}
+
+/* ---------- setup form ---------- */
+const FIELDS = [
+  ['actor', 'Speaker', ['actor','from','sender','agent','author','speaker','user','name','source']],
+  ['text', 'Text', ['text','body','content','message','msg']],
+  ['ts', 'Time', ['ts','time','timestamp','created_at','date','datetime']],
+  ['channel', 'Room or thread', ['channel','room','thread','thread_id','conversation','chat']],
+  ['recipients', 'Recipients', ['to','recipients','mentions','addressee']],
+  ['kind', 'Type (optional)', ['kind','type','msg_type','event']],
+];
+let files = [], keys = [];
+const fmt = () => document.querySelector('input[name="fmt"]:checked').value;
+function buildMap(){
+  const box = $('map'); box.innerHTML = '';
+  FIELDS.forEach(([id, label, guess]) => {
+    const g = keys.find(k => guess.includes(k.toLowerCase())) || '';
+    const opts = ['<option value="">—</option>'].concat(keys.map(k => `<option${k === g ? ' selected' : ''}>${k.replace(/</g,'&lt;')}</option>`)).join('');
+    const l = document.createElement('label'); l.innerHTML = `${label}<select id="map-${id}">${opts}</select>`;
+    box.appendChild(l);
+  });
+  updateRun();
+}
+async function firstLine(file){
+  let stream = file.stream();
+  if (file.name.endsWith('.gz') && 'DecompressionStream' in window) stream = stream.pipeThrough(new DecompressionStream('gzip'));
+  const reader = stream.pipeThrough(new TextDecoderStream()).getReader(); let buf = '';
+  while (true) { const {value, done} = await reader.read(); if (value) buf += value; const i = buf.indexOf('\n'); if (i >= 0 || done) { reader.cancel(); return (i >= 0 ? buf.slice(0, i) : buf).trim(); } if (buf.length > 2e6) { reader.cancel(); return ''; } }
+}
+async function setKeysFrom(text){
+  try { const row = JSON.parse(text); keys = []; (function walk(o, p){ for (const [k, v] of Object.entries(o)) { const key = p ? p + '.' + k : k; if (v && typeof v === 'object' && !Array.isArray(v) && key.split('.').length < 3) walk(v, key); else keys.push(key); } })(row, ''); }
+  catch { keys = []; log('The first line is not JSON. Is this a JSONL file?', 'err'); }
+  buildMap();
+}
+async function onFmt(){
+  const f = fmt();
+  $('file-box').hidden = f === 'sample';
+  $('map-box').hidden = !(f === 'sample' || f === 'generic');
+  $('inf-box').hidden = f !== 'swarm_traces';
+  $('map-legend').textContent = (f === 'sample' ? '2' : '3') + ' · Fields';
+  const fi = $('file'); fi.value = ''; files = []; keys = [];
+  fi.multiple = f === 'ai_village';
+  fi.accept = f === 'ai_village' ? '.gz' : '.jsonl,.json,.gz,.txt';
+  $('file-hint').textContent = f === 'ai_village' ? 'Choose all the .jsonl.gz tables of one village (chat_messages, agents, chat_rooms, events, …).' : f === 'swarm_traces' ? 'Choose redacted.jsonl.gz.' : 'Drop a .jsonl or .jsonl.gz file here or choose one.';
+  if (f === 'sample') { const t = await (await fetch('engine/sample_log.txt')).text(); setKeysFrom(t.split('\n')[0]); }
+  else buildMap();
+}
+document.querySelectorAll('input[name="fmt"]').forEach(r => r.addEventListener('change', onFmt));
+async function takeFiles(list){
+  files = [...list]; if (!files.length) return updateRun();
+  const mb = files.reduce((a, f) => a + f.size, 0) / 1e6;
+  $('file-hint').textContent = files.map(f => f.name).join(', ') + ` · ${mb.toFixed(1)} MB`;
+  if (fmt() === 'generic') await setKeysFrom(await firstLine(files[0]));
+  updateRun();
+}
+$('file').addEventListener('change', e => takeFiles(e.target.files));
+const drop = $('drop');
+['dragenter','dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
+['dragleave','drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
+drop.addEventListener('drop', e => takeFiles(e.dataTransfer.files));
+function updateRun(){
+  const f = fmt();
+  const haveFile = f === 'sample' || files.length > 0;
+  const haveActor = !(f === 'sample' || f === 'generic') || ($('map-actor') && $('map-actor').value);
+  $('run').disabled = !(ready && haveFile && haveActor);
+}
+$('map').addEventListener('change', updateRun);
+
+/* ---------- run ---------- */
+$('run').addEventListener('click', async () => {
+  const f = fmt(); $('run').disabled = true; $('result').hidden = true; $('chips').hidden = true;
+  $('runlog').textContent = ''; t0 = performance.now(); engine('busy', 'Running…');
+  let payload = [], path, mode = f, fmap = '';
+  if (f === 'sample') { payload = [{name: 'sample_log.jsonl', buf: await (await fetch('engine/sample_log.txt')).arrayBuffer()}]; path = '/data/in/sample_log.jsonl'; mode = 'generic'; }
+  else { for (const x of files) payload.push({name: x.name, buf: await x.arrayBuffer()}); path = f === 'ai_village' ? '/data/in' : '/data/in/' + files[0].name; }
+  if (mode === 'generic') fmap = FIELDS.map(([id]) => [id, $('map-' + id).value]).filter(([, v]) => v).map(([k, v]) => k + '=' + v).join(',');
+  log(`Log: ${f === 'sample' ? 'sample (synthetic)' : payload.map(p => p.name).join(', ')}`);
+  worker.postMessage({type: 'run', files: payload, args: {path, fmt: mode, fmap, inference: f === 'swarm_traces' ? $('inf').value : 'off'}}, payload.map(p => p.buf));
+});
+function finish(o){
+  const secs = ((performance.now() - t0) / 1000).toFixed(1);
+  log(`Done in ${secs} s.`); engine('ready', 'Engine ready (Python in your browser)'); updateRun();
+  const s = o.summary || {}; const chips = $('chips'); chips.innerHTML = '';
+  [[s.n_events, 'events'], [s.n_ai_agents ?? s.n_named_agents, 'agents'], [s.n_humans, 'humans'], [s.active_days, 'active days'], [s.n_shared_deaddrops, 'shared resources']]
+    .filter(([v]) => v !== null && v !== undefined)
+    .forEach(([v, l]) => { const c = document.createElement('div'); c.className = 'chip'; c.innerHTML = `<b>${Number(v).toLocaleString()}</b><span>${l}</span>`; chips.appendChild(c); });
+  chips.hidden = false;
+  $('res-frame').srcdoc = o.html;
+  const safe = o.report.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  $('report').innerHTML = window.marked ? marked.parse(safe) : '<pre>' + safe + '</pre>';
+  $('res-time').textContent = `Engine time ${o.seconds} s · total ${secs} s`;
+  $('result').hidden = false; $('result').scrollIntoView({behavior: 'smooth', block: 'start'});
+}
+
+onFmt(); route();
+})();
+</script>
