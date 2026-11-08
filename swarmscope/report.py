@@ -174,12 +174,18 @@ def _markdown_attributed(log: EventLog, f: dict) -> str:
     L.append(f"- Events: **{s['n_events']:,}** ({', '.join(f'{k}: {v:,}' for k, v in s['kinds'].items())})")
     if timed:
         span = f"{hours:.1f} h" if hours < 72 else f"{hours / 24:.0f} days"
-        L.append(f"- Agents who spoke: **{len(agents)}**; chat messages: **{len(chats):,}** "
+        who = "Actors (the field mapped to `actor`)" if s.get("source") == "generic" else "Agents who spoke"
+        L.append(f"- {who}: **{len(agents)}**; chat messages: **{len(chats):,}** "
                  f"({len(humans):,} by humans); rooms: {len(rooms)} (largest holds {_pct(top_room_share)}); "
                  f"time span: **{span}** ({_hm(timed[0].ts)} to {_hm(timed[-1].ts)} UTC)")
-    L.append("- Every event names its author and has a real time, so no inference is needed. "
-             "A message that writes `@name` is an edge from the speaker to that agent. Humans appear only as "
-             "anonymous ids (`human:` plus 8 characters).\n")
+    if s.get("source") == "generic":
+        L.append("- Every event has an actor and a time from the field map, so no inference is run. Whether an "
+                 "actor is an agent depends on what the mapped field holds. A message that writes `@name` is an "
+                 "edge from the speaker to that actor.\n")
+    else:
+        L.append("- Every event names its author and has a real time, so no inference is needed. "
+                 "A message that writes `@name` is an edge from the speaker to that agent. Humans appear only as "
+                 "anonymous ids (`human:` plus 8 characters).\n")
     ms = getattr(log, "milestones", {}) or {}
     lab = getattr(log, "milestone_labels", {}) or {}
     nh = getattr(log, "human_messages", 0)
@@ -683,8 +689,9 @@ def to_markdown(log: EventLog, f: dict) -> str:
              "signals are the multi-agent ones: `private_channel` (structure only: a non-task resource used "
              "repeatedly by 2-3 agents) and `board` (needs the swarm's own message format, which an "
              "investigator learns only in hindsight). A date with no time of day is read as 12:00 UTC, so "
-             "its error can be up to 12 hours. Milestones come from the METR/Redwood report. Real-world "
-             "false-alarm rates are not measured yet; on synthetic logs with a planted colluding pair "
+             "its error can be up to 12 hours. Milestones come from the METR/Redwood report. False-alarm "
+             "rates on benign logs are measured by `scripts/flag_early.py` and `scripts/validate_mission.py`; "
+             "on synthetic logs with a planted colluding pair "
              "(`tests/test_synthetic.py`, 100 seeds) `private_channel` has 100% recall, 0% early fires and "
              "0% false alarms.\n")
 

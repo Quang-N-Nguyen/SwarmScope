@@ -1,6 +1,6 @@
 """How well does SwarmScope do each part of its mission? Experiments with a known answer.
 
-    python scripts/validate_mission.py          # writes outputs/validation.md and outputs/validation.json
+    python scripts/validate_mission.py          # writes outputs/validation.json
 
 Each experiment plants something with a known truth into a REAL log, runs the
 tool's own detector on it, and counts how often the tool gets the truth back.
@@ -92,7 +92,7 @@ def exp_ties(st, ks=(2, 4, 8, 16), trials=4, seed=1):
                     ranks.append(rank)
                     break
         rows.append(dict(shared_rare_resources=k, trials=trials, validated=found,
-                         median_rank=statistics.median(ranks) if ranks else None))
+                         median_rank=statistics.median(ranks) if ranks else None, ranks=ranks))
         print(f"  ties k={k}: validated {found}/{trials}, ranks {ranks}", file=sys.stderr)
     return rows
 

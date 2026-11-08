@@ -1,8 +1,8 @@
 # SwarmScope findings: `generic`
 
 - Events: **37,649** (chat: 37,649)
-- Agents who spoke: **40**; chat messages: **37,649** (0 by humans); rooms: 3 (largest holds 70.8%); time span: **1062 days** (Oct 24 00:31 to Sep 20 05:25 UTC)
-- Every event names its author and has a real time, so no inference is needed. A message that writes `@name` is an edge from the speaker to that agent. Humans appear only as anonymous ids (`human:` plus 8 characters).
+- Actors (the field mapped to `actor`): **40**; chat messages: **37,649** (0 by humans); rooms: 3 (largest holds 70.8%); time span: **1062 days** (Oct 24 00:31 to Sep 20 05:25 UTC)
+- Every event has an actor and a time from the field map, so no inference is run. Whether an actor is an agent depends on what the mapped field holds. A message that writes `@name` is an edge from the speaker to that actor.
 
 ## 1. Side rooms (could agents talk out of sight?)
 

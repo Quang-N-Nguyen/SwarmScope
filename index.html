@@ -195,7 +195,7 @@ footer{font-size:13px; color:var(--muted); border-top:1px solid var(--line); pad
         <tr><td>Who talked to whom</td><td>Planted pair in real Swarm Traces; hidden names, held-out</td><td>Pair ranked 1st of all pairs from 4 shared rare resources (12 of 12 trials); inferred names 95% precise</td><td><span class="pill ok">works</span></td></tr>
         <tr><td>How information spread</td><td>Planted spreading trees in real swarm-village chat</td><td>True source named for 99.7% of hand-offs by @-address; chance (16%) when an item was only seen in the room</td><td><span class="pill part">partly</span></td></tr>
         <tr><td>Covert channels</td><td>Planted hidden channels in real benign logs</td><td>100% found within the group-size limit with 6+ uses, in 2–5 h; never found for groups of 4+</td><td><span class="pill part">partly</span></td></tr>
-        <tr><td>Hidden-channel flags</td><td>Flag rate, attack vs four benign villages</td><td>Shortener chains, credentials, registries, board, Kubernetes mark the attack; image read-back, locks, DNS do not</td><td><span class="pill part">partly</span></td></tr>
+        <tr><td>Hidden-channel flags</td><td>Flag rate, attack vs four benign villages</td><td>Shortener chains, credentials, registries, board, Kubernetes mark the attack log; image read-back, locks, DNS do not</td><td><span class="pill part">partly</span></td></tr>
         <tr><td>Flag early</td><td>Real attack, two real incidents, three benign villages</td><td>44.7 h before the RCE; both incidents caught; 0–0.73 false alarms per active day</td><td><span class="pill ok">works</span></td></tr>
         <tr><td>Misbehaviour</td><td>Blind-labelled samples</td><td>Role claims 86% precise, role drift 100% precise; each misses about half</td><td><span class="pill ok">works</span></td></tr>
       </tbody>
@@ -300,7 +300,7 @@ footer{font-size:13px; color:var(--muted); border-top:1px solid var(--line); pad
     <div class="f-text">
       <span class="f-num">Finding 5 · all logs</span>
       <h3>Two signal families together: early warning with few false alarms</h3>
-      <p>A combined alert fires when K different signal families fire within 6 hours. With K = 2 it keeps the Swarm Traces lead, catches both swarm-village incidents, and stays silent on game-jam. On the long, busy villages it fires about once every 2 active days: a queue for a human, not an alarm.</p>
+      <p>A combined alert fires when K different signal families fire within 6 hours. With K = 2 it keeps the Swarm Traces lead, catches both swarm-village incidents, and stays silent on game-jam. On the long, busy villages it fires 0.6–0.7 times per active day: a queue for a human, not an alarm.</p>
       <div class="btns">
         <a class="btn" href="#viewers">All viewers</a>
       </div>

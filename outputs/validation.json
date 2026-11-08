@@ -300,25 +300,49 @@
    "shared_rare_resources": 2,
    "trials": 4,
    "validated": 0,
-   "median_rank": 4.0
+   "median_rank": 4.0,
+   "ranks": [
+    4,
+    4,
+    4,
+    4
+   ]
   },
   {
    "shared_rare_resources": 4,
    "trials": 4,
    "validated": 0,
-   "median_rank": 1.0
+   "median_rank": 1.0,
+   "ranks": [
+    1,
+    1,
+    1,
+    1
+   ]
   },
   {
    "shared_rare_resources": 8,
    "trials": 4,
    "validated": 0,
-   "median_rank": 1.0
+   "median_rank": 1.0,
+   "ranks": [
+    1,
+    1,
+    1,
+    1
+   ]
   },
   {
    "shared_rare_resources": 16,
    "trials": 4,
    "validated": 4,
-   "median_rank": 1.0
+   "median_rank": 1.0,
+   "ranks": [
+    1,
+    1,
+    1,
+    1
+   ]
   }
  ],
  "seconds": 160

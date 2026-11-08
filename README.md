@@ -56,7 +56,7 @@ swarmscope/
                                     rooms, influence, emergence
   viz/                              template.html + inlined D3 -> one offline HTML viewer
   report.py, cli.py
-scripts/                            download, sweep_inference, compare_villages, flag_early, transluce_to_jsonl
+scripts/                            download, sweep_inference, compare_villages, flag_early, validate_mission, transluce_to_jsonl
 tests/                              synthetic, loader and detector tests
 docs/figures/                       figures used in PROJECT.md
 platform/                           in-browser workbench: page, entry point, sample log, build script
